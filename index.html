@@ -3,22 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>socket工程使用紀錄</title>
-    <!-- 載入必要庫 -->
+    <title>SOCKET 工程使用紀錄</title>
+    <!-- 載入必要開發庫 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-auth-compat.js"></script>
+    
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         body { background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        /* 標題列樣式 */
         .glass-header {
             background-color: rgba(30, 41, 59, 0.9);
             backdrop-filter: blur(12px);
@@ -96,8 +98,8 @@
                 const recordsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records');
                 const unsubscribe = recordsRef.onSnapshot((snapshot) => {
                     const dbData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // 為了測試，暫時允許顯示帶有「測試」字眼的資料
-                    setRecords(dbData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+                    const formalData = dbData.filter(r => !['測試', '無此人', '範例'].some(name => r.user?.includes(name)));
+                    setRecords(formalData.sort((a, b) => new Date(b.date) - new Date(a.date)));
                     setLoading(false);
                 });
                 return () => unsubscribe();
@@ -146,7 +148,8 @@
             };
 
             const handleEntry = () => {
-                if (entryPassword === '666666') {
+                // 入口密碼: 620520
+                if (entryPassword === '620520') {
                     setIsPageLocked(false);
                     showToast('歡迎進入系統');
                 } else {
@@ -247,24 +250,6 @@
                 } else { setShowScanner(false); }
             };
 
-            // 核心：產生測試逾期資料
-            const generateTestData = async () => {
-                const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
-                try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records').add({
-                        user: '測試人員',
-                        items: ['SKT-TEST-999'],
-                        date: fiveDaysAgo,
-                        status: 'Checked Out',
-                        createdAt: Date.now()
-                    });
-                    setIsDeleteModalOpen(false);
-                    setDeletePassword('');
-                    setActiveTab('in_use');
-                    showToast('測試資料已產生');
-                } catch (err) { console.error(err); }
-            };
-
             const exportCSV = () => {
                 if (filteredHistoryRecords.length === 0) return;
                 const headers = ["日期", "人員", "Socket", "狀態"];
@@ -337,10 +322,7 @@
                                     placeholder="密碼" value={deletePassword} 
                                     onChange={(e) => {setDeletePassword(e.target.value); setPasswordError(false);}} 
                                 />
-                                
-                                <button onClick={generateTestData} className="text-xs text-slate-300 underline decoration-dotted font-bold">產生測試逾期資料</button>
-
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-2 gap-3 pt-4">
                                     <button onClick={() => {setIsDeleteModalOpen(false); setDeletePassword('');}} className="py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-lg">取消</button>
                                     <button onClick={async () => {
                                         if(deletePassword === '168168') {
@@ -381,7 +363,7 @@
                     )}
 
                     <header className="glass-header text-white p-6 sticky top-0 z-20 shadow-xl flex justify-between items-center border-b border-white/10">
-                        <h1 className="text-xl font-black tracking-tighter uppercase">socket工程使用紀錄</h1>
+                        <h1 className="text-xl font-black tracking-tight uppercase tracking-wider">SOCKET 工程使用紀錄</h1>
                         <div className="text-[11px] font-black text-slate-300 flex items-center gap-1.5 uppercase bg-white/10 px-3 py-1.5 rounded-full">
                             <div className={`w-2 h-2 rounded-full ${user ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-amber-500'}`} /> {user ? 'Online' : 'Sync'}
                         </div>
@@ -401,7 +383,7 @@
                             <div className="space-y-4 animate-in fade-in duration-300">
                                 <div className="bg-white p-5 sm:p-7 rounded-[2.5rem] shadow-sm border border-slate-200">
                                     <label className="text-slate-400 font-black text-xs uppercase mb-3 block tracking-widest text-center">領用人姓名</label>
-                                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-5 text-xl font-bold outline-none focus:border-blue-600 mb-8" placeholder="輸入姓名" value={formData.user} onChange={(e) => setFormData({...formData, user: e.target.value})} />
+                                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-5 text-xl font-bold outline-none focus:border-blue-600 mb-8 transition-all" placeholder="輸入姓名" value={formData.user} onChange={(e) => setFormData({...formData, user: e.target.value})} />
                                     
                                     <div className="flex justify-between items-center mb-4 px-1">
                                         <label className="text-slate-400 font-black text-xs uppercase tracking-widest">領用編號輸入</label>
@@ -559,7 +541,7 @@
                             <div className="flex flex-col"><span className="text-[11px] text-slate-400 font-black uppercase tracking-widest leading-tight">使用中</span><span className="text-2xl font-black text-blue-700 leading-none">{activeRecords.length}</span></div>
                             <div className="flex flex-col"><span className="text-[11px] text-slate-400 font-black uppercase tracking-widest leading-tight">逾期</span><span className={`text-2xl font-black leading-none ${overdueCount > 0 ? 'text-rose-600' : 'text-slate-200'}`}>{overdueCount}</span></div>
                         </div>
-                        <div className="text-[10px] font-black text-slate-300 italic tracking-widest uppercase">Socket Final V8.3</div>
+                        <div className="text-[10px] font-black text-slate-300 italic tracking-widest uppercase">Socket Final V8.6</div>
                     </footer>
                 </div>
             );
