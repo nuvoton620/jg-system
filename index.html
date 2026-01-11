@@ -103,7 +103,6 @@
                 const recordsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records');
                 const unsubscribe = recordsRef.onSnapshot((snapshot) => {
                     const dbData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // 排除測試關鍵字資料
                     const formalData = dbData.filter(r => !['測試', '無此人', '範例'].some(name => r.user?.includes(name)));
                     setRecords(formalData.sort((a, b) => new Date(b.date) - new Date(a.date)));
                     setLoading(false);
@@ -111,7 +110,7 @@
                 return () => unsubscribe();
             }, [user]);
 
-            // 圖示與組件更新時觸發
+            // 圖示渲染
             useEffect(() => {
                 setTimeout(() => { if(window.lucide) window.lucide.createIcons(); }, 200);
             }, [activeTab, showScanner, records, isPageLocked, toastMsg, showOverdueModal, showOnlyOverdue]);
@@ -157,10 +156,8 @@
             };
 
             const handleEntry = () => {
-                // 入口密碼改為 620026
                 if (entryPassword === '620026') {
                     setIsPageLocked(false);
-                    showToast('歡迎進入系統');
                 } else {
                     setPasswordError(true);
                     setTimeout(() => setPasswordError(false), 1000);
@@ -368,12 +365,16 @@
 
                     <header className="glass-header text-white p-6 sticky top-0 z-20 shadow-xl flex justify-between items-center border-b border-white/10">
                         <h1 className="text-xl font-black tracking-tight uppercase tracking-wider">SOCKET 工程使用紀錄</h1>
-                        <div className="text-[11px] font-black text-slate-300 flex items-center gap-1.5 uppercase bg-white/10 px-3 py-1.5 rounded-full">
-                            <div className={`w-2 h-2 rounded-full ${user ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-amber-500'}`} /> {user ? 'Online' : 'Sync'}
+                        <div className="flex flex-col items-end">
+                            <div className="text-[11px] font-black text-slate-300 flex items-center gap-1.5 uppercase bg-white/10 px-3 py-1.5 rounded-full">
+                                <div className={`w-2 h-2 rounded-full ${user ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-amber-500'}`} /> {user ? 'Online' : 'Sync'}
+                            </div>
+                            {/* 新增：逾期提醒小紅字 */}
+                            <span className="text-[10px] font-bold text-rose-400 mt-1 mr-1">借出逾3天視為逾期</span>
                         </div>
                     </header>
 
-                    <nav className="flex bg-white border-b sticky top-[72px] z-10 shadow-sm">
+                    <nav className="flex bg-white border-b sticky top-[84px] z-10 shadow-sm">
                         {[{ id: 'checkout', label: '領出', icon: 'log-out' }, { id: 'return', label: '歸還', icon: 'log-in' }, { id: 'in_use', label: '使用中', icon: 'clock' }, { id: 'history', label: '歷史', icon: 'history' }].map((tab) => (
                             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 py-4 text-sm font-black transition-all flex flex-col items-center relative ${activeTab === tab.id ? 'text-blue-700 bg-blue-50/50' : 'text-slate-400'}`}>
                                 <i data-lucide={tab.icon} className="w-6 h-6 mb-1"></i> {tab.label}
@@ -396,7 +397,14 @@
                                     <div className="h-7 mb-1">{inputError && <p className="text-rose-500 text-xs font-black flex items-center gap-1.5 animate-pulse"><i data-lucide="alert-triangle" className="w-4 h-4"></i> {inputError}</p>}</div>
                                     
                                     <div className="flex items-center gap-3 mb-8 px-1 overflow-hidden">
-                                        <input type="text" className={`flex-1 min-w-0 bg-slate-50 border-2 rounded-2xl px-5 py-4 text-base font-bold outline-none transition-all ${inputError ? 'border-rose-500 bg-rose-50' : 'border-slate-100 focus:border-blue-600'}`} placeholder="手動輸入" value={formData.itemInput} onChange={(e) => {setFormData({...formData, itemInput: e.target.value}); setInputError('');}} onKeyPress={(e) => e.key === 'Enter' && addSocketToTemp(formData.itemInput)} />
+                                        <input 
+                                            type="text" 
+                                            className={`flex-1 min-w-0 bg-slate-50 border-2 rounded-2xl px-5 py-4 text-base font-bold outline-none transition-all uppercase ${inputError ? 'border-rose-500 bg-rose-50' : 'border-slate-100 focus:border-blue-600'}`} 
+                                            placeholder="手動輸入" 
+                                            value={formData.itemInput} 
+                                            onChange={(e) => {setFormData({...formData, itemInput: e.target.value.toUpperCase()}); setInputError('');}} 
+                                            onKeyPress={(e) => e.key === 'Enter' && addSocketToTemp(formData.itemInput)} 
+                                        />
                                         <button onClick={() => addSocketToTemp(formData.itemInput)} className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex-none flex items-center justify-center font-bold text-3xl shadow-md active:scale-90">+</button>
                                     </div>
 
@@ -553,7 +561,7 @@
                             <div className="flex flex-col"><span className="text-[11px] text-slate-400 font-black uppercase tracking-widest leading-tight">使用中</span><span className="text-2xl font-black text-blue-700 leading-none">{activeRecords.length}</span></div>
                             <div className="flex flex-col"><span className="text-[11px] text-slate-400 font-black uppercase tracking-widest leading-tight">逾期</span><span className={`text-2xl font-black leading-none ${overdueCount > 0 ? 'text-rose-600' : 'text-slate-200'}`}>{overdueCount}</span></div>
                         </div>
-                        <div className="text-[10px] font-black text-slate-300 italic tracking-widest uppercase">Socket Final V8.7</div>
+                        <div className="text-[10px] font-black text-slate-300 italic tracking-widest uppercase">Socket Final V9.0</div>
                     </footer>
                 </div>
             );
