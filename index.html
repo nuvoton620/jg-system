@@ -103,6 +103,7 @@
                 const recordsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records');
                 const unsubscribe = recordsRef.onSnapshot((snapshot) => {
                     const dbData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    // 排除測試關鍵字資料
                     const formalData = dbData.filter(r => !['測試', '無此人', '範例'].some(name => r.user?.includes(name)));
                     setRecords(formalData.sort((a, b) => new Date(b.date) - new Date(a.date)));
                     setLoading(false);
@@ -110,10 +111,10 @@
                 return () => unsubscribe();
             }, [user]);
 
-            // 圖示渲染
+            // 圖示與組件更新時觸發
             useEffect(() => {
                 setTimeout(() => { if(window.lucide) window.lucide.createIcons(); }, 200);
-            }, [activeTab, showScanner, records, isPageLocked, toastMsg, showOverdueModal, showOnlyOverdue]);
+            }, [activeTab, showScanner, records, isPageLocked, toastMsg, showOverdueModal, showOnlyOverdue, isDeleteModalOpen, showReturnModal]);
 
             // 逾期判定 (3天)
             const isOverdue = (dateString) => Math.ceil(Math.abs(new Date() - new Date(dateString)) / (1000 * 60 * 60 * 24)) > 3;
@@ -156,6 +157,7 @@
             };
 
             const handleEntry = () => {
+                // 入口密碼：620026
                 if (entryPassword === '620026') {
                     setIsPageLocked(false);
                 } else {
@@ -305,60 +307,71 @@
                         </div>
                     )}
 
-                    {/* Modal：歸還確認 */}
+                    {/* Modal：歸還確認 (優化尺寸與置中) */}
                     {showReturnModal && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md">
-                            <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-xs shadow-2xl text-center space-y-6">
-                                <div className="text-emerald-600 flex justify-center"><i data-lucide="inbox" className="w-14 h-14"></i></div>
-                                <div className="space-y-3">
-                                    <h3 className="text-2xl font-black text-slate-800">歸還確認</h3>
-                                    <p className="text-base font-bold text-emerald-700 leading-relaxed px-2 bg-emerald-50 py-4 rounded-2xl">記得放在歸還箱喔！<br/>感謝您的配合。</p>
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
+                            <div className="bg-white rounded-[2rem] p-6 w-full max-w-[300px] shadow-2xl text-center space-y-4">
+                                <div className="text-emerald-600 flex justify-center"><i data-lucide="inbox" className="w-12 h-12"></i></div>
+                                <div className="space-y-2">
+                                    <h3 className="text-xl font-black text-slate-800">歸還確認</h3>
+                                    <p className="text-sm font-bold text-emerald-700 leading-relaxed px-2 bg-emerald-50 py-3 rounded-2xl">記得放在歸還箱喔！<br/>感謝您的配合。</p>
                                 </div>
-                                <button onClick={executeReturn} className="w-full py-5 bg-emerald-600 text-white rounded-2xl font-black shadow-lg text-xl">確認，已歸還</button>
-                                <button onClick={() => setShowReturnModal(false)} className="text-slate-400 font-bold text-base py-2">取消</button>
+                                <div className="flex flex-col gap-2">
+                                    <button onClick={executeReturn} className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg text-lg">確認，已歸還</button>
+                                    <button onClick={() => setShowReturnModal(false)} className="text-slate-400 font-bold text-sm py-1">取消</button>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Modal：管理驗證 (密碼: 168168) */}
+                    {/* Modal：管理驗證 (優化尺寸與置中) */}
                     {isDeleteModalOpen && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/90 backdrop-blur-md">
-                            <div className="bg-white rounded-[2rem] p-8 w-full max-w-xs shadow-2xl space-y-6 text-center">
-                                <h3 className="text-2xl font-black text-slate-800">管理員驗證</h3>
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
+                            <div className="bg-white rounded-[1.8rem] p-6 w-full max-w-[280px] shadow-2xl space-y-5 text-center">
+                                <h3 className="text-xl font-black text-slate-800">管理員驗證</h3>
                                 <input 
                                     type="text" inputMode="numeric" pattern="[0-9]*" 
-                                    className={`w-full bg-slate-50 border-2 rounded-2xl px-5 py-5 text-center text-4xl font-black tracking-widest outline-none ${passwordError ? 'border-rose-500 bg-rose-50' : 'border-slate-200 focus:border-blue-600'}`} 
+                                    className={`w-full bg-slate-50 border-2 rounded-2xl px-4 py-4 text-center text-3xl font-black tracking-widest outline-none ${passwordError ? 'border-rose-500 bg-rose-50' : 'border-slate-200 focus:border-blue-600'}`} 
                                     placeholder="密碼" value={deletePassword} 
                                     onChange={(e) => {setDeletePassword(e.target.value); setPasswordError(false);}} 
                                 />
-                                <div className="grid grid-cols-2 gap-3 pt-4">
-                                    <button onClick={() => {setIsDeleteModalOpen(false); setDeletePassword('');}} className="py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-lg">取消</button>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={() => {setIsDeleteModalOpen(false); setDeletePassword('');}} className="py-3 bg-slate-100 text-slate-500 rounded-2xl font-black">取消</button>
                                     <button onClick={async () => {
                                         if(deletePassword === '168168') {
                                             for(const id of pendingDeleteIds) await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records').doc(id).delete();
                                             setIsDeleteModalOpen(false); setDeletePassword(''); showToast('紀錄已刪除');
                                         } else setPasswordError(true);
-                                    }} className="py-4 bg-rose-600 text-white rounded-2xl font-black shadow-lg text-lg">確認</button>
+                                    }} className="py-3 bg-rose-600 text-white rounded-2xl font-black shadow-lg">確認</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Modal：逾期溫馨提醒 */}
+                    {/* Modal：逾期溫馨提醒 (優化尺寸與置中) */}
                     {showOverdueModal && (
-                        <div className="fixed inset-0 z-[160] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md">
-                            <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-xs shadow-2xl text-center space-y-6">
+                        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
+                            <div className="bg-white rounded-[2rem] p-6 w-full max-w-[300px] shadow-2xl text-center space-y-4">
                                 <div className="text-rose-500 flex justify-center">
-                                    <div className="relative"><i data-lucide="home" className="w-16 h-16 opacity-10"></i><i data-lucide="heart" className="w-11 h-11 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-rose-500 fill-rose-500"></i></div>
+                                    <div className="relative"><i data-lucide="home" className="w-14 h-14 opacity-10"></i><i data-lucide="heart" className="w-9 h-9 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-rose-500 fill-rose-500"></i></div>
                                 </div>
                                 <div className="space-y-2">
-                                    <h3 className="text-2xl font-black text-slate-800">溫馨提醒</h3>
-                                    <p className="text-base font-bold text-slate-600 leading-relaxed px-2">嗨 {formData.user}，您的 Socket 已經在外面流浪太久了，<br/><span className="text-rose-600 font-black underline decoration-2">記得帶它回家（歸還）</span>喔！</p>
+                                    <h3 className="text-xl font-black text-slate-800">溫馨提醒</h3>
+                                    <p className="text-sm font-bold text-slate-600 leading-relaxed px-1">嗨 {formData.user}，您的 Socket 流浪太久了，<br/><span className="text-rose-600 font-black underline decoration-2">記得帶它回家（歸還）</span>喔！</p>
                                 </div>
-                                <div className="flex flex-col gap-3">
+                                <div className="flex flex-col gap-2">
                                     <button onClick={() => { setShowOverdueModal(false); setActiveTab('return'); setReturnSearchQuery(formData.user); }} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black shadow-lg text-lg">好，先去歸還</button>
-                                    <button onClick={executeCheckout} className="text-slate-400 font-bold text-sm underline decoration-dotted py-2">仍要領用</button>
+                                    <button onClick={executeCheckout} className="text-slate-400 font-bold text-xs underline decoration-dotted py-1">仍要領用</button>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showScanner && (
+                        <div className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-center p-6">
+                            <div className="w-full max-w-sm relative text-center">
+                                <button onClick={stopScanner} className="absolute -top-16 right-0 text-white p-4 bg-white/10 rounded-full"><i data-lucide="x" className="w-9 h-9"></i></button>
+                                <div id="reader" className="w-full rounded-3xl overflow-hidden border-4 border-blue-500 shadow-2xl bg-slate-900"></div>
                             </div>
                         </div>
                     )}
@@ -369,7 +382,6 @@
                             <div className="text-[11px] font-black text-slate-300 flex items-center gap-1.5 uppercase bg-white/10 px-3 py-1.5 rounded-full">
                                 <div className={`w-2 h-2 rounded-full ${user ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-amber-500'}`} /> {user ? 'Online' : 'Sync'}
                             </div>
-                            {/* 新增：逾期提醒小紅字 */}
                             <span className="text-[10px] font-bold text-rose-400 mt-1 mr-1">借出逾3天視為逾期</span>
                         </div>
                     </header>
@@ -561,7 +573,7 @@
                             <div className="flex flex-col"><span className="text-[11px] text-slate-400 font-black uppercase tracking-widest leading-tight">使用中</span><span className="text-2xl font-black text-blue-700 leading-none">{activeRecords.length}</span></div>
                             <div className="flex flex-col"><span className="text-[11px] text-slate-400 font-black uppercase tracking-widest leading-tight">逾期</span><span className={`text-2xl font-black leading-none ${overdueCount > 0 ? 'text-rose-600' : 'text-slate-200'}`}>{overdueCount}</span></div>
                         </div>
-                        <div className="text-[10px] font-black text-slate-300 italic tracking-widest uppercase">Socket Final V9.0</div>
+                        <div className="text-[10px] font-black text-slate-300 italic tracking-widest uppercase">Socket Final V9.1</div>
                     </footer>
                 </div>
             );
