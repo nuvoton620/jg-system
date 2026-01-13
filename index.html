@@ -94,7 +94,7 @@
             const [tempItems, setTempItems] = useState([]);
             const [inputError, setInputError] = useState('');
 
-            // 歷史多選狀態 (保留)
+            // 歷史多選狀態
             const [selectedHistoryIds, setSelectedHistoryIds] = useState([]);
             
             const html5QrCodeRef = useRef(null);
@@ -117,7 +117,7 @@
                 return () => unsubscribe();
             }, [user]);
 
-            // 圖示渲染：確保 DOM 穩定，避免 React removeChild 報錯
+            // 圖示渲染
             useEffect(() => {
                 const timer = setTimeout(() => {
                     if (window.lucide) {
@@ -150,8 +150,8 @@
 
             const filteredHistoryRecords = useMemo(() => {
                 return records.filter(r => {
-                    const term = historySearchTerm.toLowerCase();
-                    const matchesSearch = r.user?.toLowerCase().includes(term) || r.items?.some(i => i.toLowerCase().includes(term));
+                    const term = historySearchTerm.toUpperCase(); // 搜尋比對轉換大寫
+                    const matchesSearch = r.user?.toUpperCase().includes(term) || r.items?.some(i => i.toUpperCase().includes(term));
                     const recordDate = new Date(r.date);
                     const start = startDate ? new Date(startDate) : null;
                     const end = endDate ? new Date(endDate) : null;
@@ -270,7 +270,6 @@
                 showToast('歷史紀錄已匯出');
             };
 
-            // 歷史多選邏輯 (保留)
             const toggleHistorySelection = (id) => setSelectedHistoryIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
             const batchPrepareHistoryDelete = () => {
                 if (selectedHistoryIds.length === 0) return;
@@ -410,7 +409,6 @@
                                         <button onClick={() => addSocketToTemp(formData.itemInput)} className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex-none flex items-center justify-center font-bold text-3xl shadow-md active:scale-90">+</button>
                                     </div>
 
-                                    {/* 修正：簡化待登記清單，移除多選刪除功能 */}
                                     <div className="flex justify-between items-center mb-4 px-1">
                                         <label className="text-slate-400 font-black text-xs uppercase tracking-widest flex items-center gap-2">待登記清單 <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">{tempItems.length}</span></label>
                                     </div>
@@ -443,8 +441,8 @@
                                     <div className="flex justify-between items-center mb-6">
                                         <h3 className="text-2xl font-black text-emerald-800">歸還中心</h3>
                                         <div className="flex gap-2">
-                                            <button onClick={() => startScanner('return')} className="p-3.5 bg-slate-900 text-white rounded-xl shadow-lg active:scale-95 flex items-center justify-center">
-                                                <span className="icon-wrapper"><i data-lucide="qr-code" className="w-5 h-5"></i></span>
+                                            <button onClick={() => startScanner('return')} className="px-6 py-2.5 bg-blue-600 text-white rounded-xl shadow-lg text-sm font-black flex items-center gap-1.5 active:scale-95 transition-all">
+                                                <span className="icon-wrapper"><i data-lucide="qr-code" className="w-5 h-5"></i></span> 掃描
                                             </button>
                                             <button disabled={selectedItemsToReturn.length === 0} onClick={executeReturn} className={`px-5 py-2.5 rounded-xl font-black text-sm shadow-lg flex items-center gap-2 transition-all active:scale-95 ${selectedItemsToReturn.length > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-300'}`}>
                                                 <span className="icon-wrapper"><i data-lucide="package-check" className="w-5 h-5"></i></span> 執行歸還 ({selectedItemsToReturn.length})
@@ -453,10 +451,10 @@
                                     </div>
                                     <div className="relative mb-6">
                                         <span className="icon-wrapper absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"><i data-lucide="search" className="w-5 h-5"></i></span>
-                                        <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-5 text-base font-bold outline-none focus:border-emerald-600 transition-all" placeholder="搜尋人名或編號..." value={returnSearchQuery} onChange={(e) => setReturnSearchQuery(e.target.value)} />
+                                        <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-5 text-base font-bold outline-none focus:border-emerald-600 transition-all uppercase" placeholder="搜尋人名或編號..." value={returnSearchQuery} onChange={(e) => setReturnSearchQuery(e.target.value.toUpperCase())} />
                                     </div>
                                     <div className="space-y-4 min-h-[200px] no-scrollbar">
-                                        {activeRecords.filter(r => (r.user.includes(returnSearchQuery) || r.items.some(i => i.includes(returnSearchQuery)))).sort((a,b) => (isOverdue(a.date) && !isOverdue(b.date) ? -1 : !isOverdue(a.date) && isOverdue(b.date) ? 1 : new Date(b.date)-new Date(a.date))).map(rec => {
+                                        {activeRecords.filter(r => (r.user.toUpperCase().includes(returnSearchQuery) || r.items.some(i => i.toUpperCase().includes(returnSearchQuery)))).sort((a,b) => (isOverdue(a.date) && !isOverdue(b.date) ? -1 : !isOverdue(a.date) && isOverdue(b.date) ? 1 : new Date(b.date)-new Date(a.date))).map(rec => {
                                             const overdue = isOverdue(rec.date);
                                             return (
                                                 <div key={rec.id} className={`rounded-[2rem] border-2 p-5 bg-white shadow-sm transition-all ${overdue ? 'border-rose-100' : 'border-slate-100'}`}>
@@ -473,7 +471,7 @@
                                                     <div className="grid grid-cols-1 gap-2.5">
                                                         {rec.items.map(item => {
                                                             const key = `${rec.id}|${item}`; const sel = selectedItemsToReturn.includes(key);
-                                                            return <div key={item} onClick={() => setSelectedItemsToReturn(sel ? selectedItemsToReturn.filter(k => k !== key) : [...selectedItemsToReturn, key])} className={`px-5 py-4 rounded-2xl border flex justify-between items-center cursor-pointer transition-all ${sel ? 'bg-emerald-50 border-emerald-300 shadow-inner' : 'bg-white border-slate-100'}`}><span className="font-mono text-base font-bold text-slate-600 uppercase">{item}</span><span>{sel ? '✅' : '⬜'}</span></div>;
+                                                            return <div key={item} onClick={() => setSelectedItemsToReturn(sel ? selectedItemsToReturn.filter(k => k !== key) : [...selectedItemsToReturn, key])} className={`px-5 py-4 rounded-2xl border flex justify-between items-center cursor-pointer transition-all ${sel ? 'bg-emerald-50 border-emerald-300 shadow-inner' : 'bg-white border-slate-100'}`}><span className="font-mono text-base font-bold text-slate-600 uppercase">{item}</span><span>{sel ? <span className="icon-wrapper"><i data-lucide="check-square" className="text-emerald-600"></i></span> : <span className="icon-wrapper"><i data-lucide="square" className="text-slate-200"></i></span>}</span></div>;
                                                         })}
                                                     </div>
                                                 </div>
@@ -513,7 +511,7 @@
                                                     {overdue && <button onClick={() => { const text = `嗨 ${rec.user}，溫馨提醒您領用的 Socket 編號 (${rec.items.join(', ')}) 已經在外面借出約 ${daysUsed} 天了，若工程已結束，記得歸還喔！辛苦了，謝謝！`; const el = document.createElement('textarea'); el.value = text; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); showToast('提醒文字已複製'); }} className="bg-amber-100 text-amber-700 px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 active:bg-amber-200 border border-amber-200 shadow-sm">
                                                         <span className="icon-wrapper"><i data-lucide="send" className="w-4 h-4"></i></span> 溫馨提醒
                                                     </button>}
-                                                    <button onClick={() => { setActiveTab('return'); setReturnSearchQuery(rec.user); }} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 uppercase shadow-md active:bg-slate-700">前往歸還</button>
+                                                    <button onClick={() => { setActiveTab('return'); setReturnSearchQuery(rec.user.toUpperCase()); }} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 uppercase shadow-md active:bg-slate-700">前往歸還</button>
                                                 </div>
                                             </div>
                                         </div>
@@ -527,7 +525,8 @@
                                 <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-200 space-y-5">
                                     <div className="relative">
                                         <span className="icon-wrapper absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"><i data-lucide="search" className="w-5 h-5"></i></span>
-                                        <input type="text" className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 outline-none focus:border-blue-500 font-bold text-base shadow-inner transition-all" placeholder="搜尋姓名或編號..." value={historySearchTerm} onChange={e => setHistorySearchTerm(e.target.value)} />
+                                        {/* 修正：歷史紀錄搜尋輸入框自動轉換為大寫 */}
+                                        <input type="text" className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 outline-none focus:border-blue-500 font-bold text-base shadow-inner transition-all uppercase" placeholder="搜尋姓名或編號..." value={historySearchTerm} onChange={(e) => setHistorySearchTerm(e.target.value.toUpperCase())} />
                                     </div>
                                     <div className="space-y-4">
                                         <div className="flex flex-col gap-3">
@@ -607,7 +606,7 @@
                             <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter leading-tight text-rose-600">逾期數量</span><span className={`text-xl font-black leading-none ${overdueItemsCount > 0 ? 'text-rose-600' : 'text-slate-700'}`}>{overdueItemsCount}</span></div>
                             <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter leading-tight text-blue-700">使用人員</span><span className="text-xl font-black text-blue-700 leading-none">{usagePeopleCount}</span></div>
                         </div>
-                        <div className="text-[9px] font-black text-slate-300 italic tracking-tighter uppercase text-right leading-tight">Socket<br/>V11.5 Final</div>
+                        <div className="text-[9px] font-black text-slate-300 italic tracking-tighter uppercase text-right leading-tight">Socket<br/>V11.8 Final</div>
                     </footer>
                 </div>
             );
