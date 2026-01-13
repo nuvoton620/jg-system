@@ -32,6 +32,11 @@
         .animate-toast { animation: fade-in-up 0.3s ease-out forwards; }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
         .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
+        
+        input[type="date"] {
+            -webkit-appearance: none;
+            min-height: 52px;
+        }
     </style>
 </head>
 <body>
@@ -64,7 +69,6 @@
             const [records, setRecords] = useState([]);
             const [loading, setLoading] = useState(true);
 
-            // UI 狀態
             const [showScanner, setShowScanner] = useState(false);
             const [scannerTarget, setScannerTarget] = useState('checkout'); 
             const [historySearchTerm, setHistorySearchTerm] = useState('');
@@ -73,7 +77,6 @@
             const [showOnlyOverdue, setShowOnlyOverdue] = useState(false);
 
             const [showOverdueModal, setShowOverdueModal] = useState(false);
-            const [showReturnModal, setShowReturnModal] = useState(false);
             const [returnSearchQuery, setReturnSearchQuery] = useState(''); 
             const [selectedItemsToReturn, setSelectedItemsToReturn] = useState([]); 
 
@@ -89,14 +92,12 @@
             
             const html5QrCodeRef = useRef(null);
 
-            // 認證初始化
             useEffect(() => {
                 auth.signInAnonymously().catch(err => console.error("Auth Fail", err));
                 const unsubscribe = auth.onAuthStateChanged((u) => setUser(u));
                 return () => unsubscribe();
             }, []);
 
-            // 監聽 Firestore 資料
             useEffect(() => {
                 if (!user) return;
                 const recordsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records');
@@ -105,23 +106,30 @@
                     const formalData = dbData.filter(r => !['測試', '無此人', '範例'].some(name => r.user?.includes(name)));
                     setRecords(formalData.sort((a, b) => new Date(b.date) - new Date(a.date)));
                     setLoading(false);
-                });
+                }, (error) => console.error("Firestore Listen Error:", error));
                 return () => unsubscribe();
             }, [user]);
 
-            // 圖示與組件渲染更新
             useEffect(() => {
-                setTimeout(() => { if(window.lucide) window.lucide.createIcons(); }, 200);
-            }, [activeTab, showScanner, records, isPageLocked, toastMsg, showOverdueModal, showOnlyOverdue, isDeleteModalOpen, showReturnModal]);
+                setTimeout(() => { if(window.lucide) window.lucide.createIcons(); }, 150);
+            }, [activeTab, showScanner, records, isPageLocked, toastMsg, showOverdueModal, showOnlyOverdue, isDeleteModalOpen, tempItems]);
 
             const isOverdue = (dateString) => Math.ceil(Math.abs(new Date() - new Date(dateString)) / (1000 * 60 * 60 * 24)) > 3;
             
             const activeRecords = useMemo(() => records.filter(r => r.status === 'Checked Out'), [records]);
-            const overdueCount = activeRecords.filter(r => isOverdue(r.date)).length;
             
-            // 新增：統計目前借出的 Socket 總顆數
+            // --- 統計數據定義 ---
+            const usagePeopleCount = activeRecords.length;
+            const overduePeopleCount = useMemo(() => activeRecords.filter(r => isOverdue(r.date)).length, [activeRecords]);
+
             const totalItemsLent = useMemo(() => {
                 return activeRecords.reduce((acc, rec) => acc + (rec.items?.length || 0), 0);
+            }, [activeRecords]);
+
+            const overdueItemsCount = useMemo(() => {
+                return activeRecords
+                    .filter(r => isOverdue(r.date))
+                    .reduce((acc, rec) => acc + (rec.items?.length || 0), 0);
             }, [activeRecords]);
 
             const displayedActiveRecords = useMemo(() => {
@@ -159,7 +167,6 @@
             };
 
             const handleEntry = () => {
-                // 入口密碼: 620026
                 if (entryPassword === '620026') {
                     setIsPageLocked(false);
                 } else {
@@ -229,11 +236,10 @@
                             });
                         }
                     }
-                    setShowReturnModal(false);
                     setSelectedItemsToReturn([]);
                     setReturnSearchQuery('');
                     setActiveTab('history');
-                    showToast('感謝您的配合！');
+                    showToast('歸還成功');
                 } catch (err) { console.error(err); }
             };
 
@@ -274,7 +280,6 @@
                 showToast('歷史紀錄已匯出');
             };
 
-            // 入口鎖畫面 (密碼: 620026)
             if (isPageLocked) {
                 return (
                     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-8 text-center">
@@ -309,25 +314,6 @@
                         </div>
                     )}
 
-                    {/* Modal：歸還確認 (大字清晰置中) */}
-                    {showReturnModal && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
-                            <div className="bg-white rounded-[2rem] p-6 w-[85%] max-w-[260px] shadow-2xl text-center space-y-4">
-                                <div className="text-emerald-600 flex justify-center"><i data-lucide="inbox" className="w-12 h-12"></i></div>
-                                <div className="space-y-2">
-                                    <h3 className="text-xl font-black text-slate-800 tracking-tight">歸還確認</h3>
-                                    <p className="text-lg font-black text-rose-600 leading-snug px-3 bg-rose-50 py-5 rounded-2xl border border-rose-100 shadow-inner">
-                                        記得放在歸還箱喔！<br/>感謝您的配合。
-                                    </p>
-                                </div>
-                                <div className="flex flex-col gap-2 pt-2">
-                                    <button onClick={executeReturn} className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg text-xl active:scale-95 transition-transform">確認，已歸還</button>
-                                    <button onClick={() => setShowReturnModal(false)} className="text-slate-400 font-black text-base py-2">返回修改</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Modal：管理員驗證 */}
                     {isDeleteModalOpen && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
@@ -355,12 +341,12 @@
                     {/* Modal：逾期提醒 */}
                     {showOverdueModal && (
                         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
-                            <div className="bg-white rounded-[2rem] p-6 w-[85%] max-w-[260px] shadow-2xl text-center space-y-4">
+                            <div className="bg-white rounded-[2rem] p-6 w-[85%] max-w-[280px] shadow-2xl text-center space-y-4">
                                 <div className="text-rose-500 flex justify-center">
                                     <div className="relative"><i data-lucide="home" className="w-12 h-12 opacity-10"></i><i data-lucide="heart" className="w-9 h-9 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-rose-500 fill-rose-500"></i></div>
                                 </div>
                                 <div className="space-y-2">
-                                    <h3 className="text-xl font-black text-slate-800">溫馨提醒</h3>
+                                    <h3 className="text-xl font-black text-slate-800 tracking-tight">溫馨提醒</h3>
                                     <p className="text-lg font-black text-slate-600 leading-snug">
                                         嗨 {formData.user}，您的 Socket 流浪太久了，<br/>
                                         <span className="text-rose-600 font-black underline decoration-2 decoration-rose-200">記得歸還</span>喔！
@@ -407,7 +393,7 @@
                             <div className="space-y-4 animate-in fade-in duration-300">
                                 <div className="bg-white p-5 sm:p-7 rounded-[2.5rem] shadow-sm border border-slate-200">
                                     <label className="text-slate-400 font-black text-xs uppercase mb-3 block tracking-widest text-center">領用人姓名</label>
-                                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-5 text-xl font-bold outline-none focus:border-blue-600 mb-8 transition-all" placeholder="輸入姓名" value={formData.user} onChange={(e) => setFormData({...formData, user: e.target.value})} />
+                                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-5 text-xl font-bold outline-none focus:border-blue-600 mb-8" placeholder="輸入姓名" value={formData.user} onChange={(e) => setFormData({...formData, user: e.target.value})} />
                                     
                                     <div className="flex justify-between items-center mb-4 px-1">
                                         <label className="text-slate-400 font-black text-xs uppercase tracking-widest">領用編號輸入</label>
@@ -432,7 +418,9 @@
                                         {tempItems.map((item, i) => (
                                             <div key={i} className="flex justify-between items-center bg-blue-50/50 px-5 py-4 rounded-2xl border border-blue-100 animate-in zoom-in-95">
                                                 <span className="font-mono font-black text-blue-900 text-lg uppercase">{item}</span>
-                                                <button onClick={() => setTempItems(tempItems.filter((_, idx) => idx !== i))} className="text-rose-400 p-2 active:scale-90"><i data-lucide="trash-2" className="w-6 h-6"></i></button>
+                                                <button onClick={() => setTempItems(prev => prev.filter((_, idx) => idx !== i))} className="text-rose-400 p-3 active:scale-90 bg-rose-50 rounded-xl">
+                                                    <i data-lucide="trash-2" className="w-6 h-6"></i>
+                                                </button>
                                             </div>
                                         ))}
                                         {tempItems.length === 0 && <div className="py-12 text-center text-slate-300 font-black italic border-2 border-dashed border-slate-100 rounded-2xl text-sm">目前清單為空</div>}
@@ -449,7 +437,7 @@
                                         <h3 className="text-2xl font-black text-emerald-800">歸還中心</h3>
                                         <div className="flex gap-2">
                                             <button onClick={() => startScanner('return')} className="p-3.5 bg-slate-900 text-white rounded-xl shadow-lg active:scale-95 flex items-center justify-center"><i data-lucide="qr-code" className="w-5 h-5"></i></button>
-                                            <button disabled={selectedItemsToReturn.length === 0} onClick={() => setShowReturnModal(true)} className={`px-5 py-2.5 rounded-xl font-black text-sm shadow-lg flex items-center gap-2 transition-all active:scale-95 ${selectedItemsToReturn.length > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-300'}`}><i data-lucide="package-check" className="w-5 h-5"></i> 執行歸還 ({selectedItemsToReturn.length})</button>
+                                            <button disabled={selectedItemsToReturn.length === 0} onClick={executeReturn} className={`px-5 py-2.5 rounded-xl font-black text-sm shadow-lg flex items-center gap-2 transition-all active:scale-95 ${selectedItemsToReturn.length > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-300'}`}><i data-lucide="package-check" className="w-5 h-5"></i> 執行歸還 ({selectedItemsToReturn.length})</button>
                                         </div>
                                     </div>
                                     <div className="relative mb-6">
@@ -457,31 +445,51 @@
                                         <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-5 text-base font-bold outline-none focus:border-emerald-600 transition-all" placeholder="搜尋人名或編號..." value={returnSearchQuery} onChange={(e) => setReturnSearchQuery(e.target.value)} />
                                     </div>
                                     <div className="space-y-4 min-h-[200px] no-scrollbar">
-                                        {activeRecords.filter(r => (r.user.includes(returnSearchQuery) || r.items.some(i => i.includes(returnSearchQuery)))).map(rec => (
-                                            <div key={rec.id} className="rounded-[2rem] border-2 p-5 border-slate-100 bg-white shadow-sm">
-                                                <div className="flex justify-between items-center mb-4">
-                                                    <span className="font-black text-base text-slate-800 bg-slate-100 px-4 py-1.5 rounded-xl">{rec.user}</span>
-                                                    <button onClick={() => {
-                                                        const keys = rec.items.map(i => `${rec.id}|${i}`);
-                                                        const allSelected = keys.every(k => selectedItemsToReturn.includes(k));
-                                                        if(allSelected) setSelectedItemsToReturn(prev => prev.filter(k => !keys.includes(k)));
-                                                        else setSelectedItemsToReturn(prev => [...new Set([...prev, ...keys])]);
-                                                    }} className="text-sm font-bold text-blue-500 underline">全選</button>
-                                                </div>
-                                                <div className="grid grid-cols-1 gap-2.5">
-                                                    {rec.items.map(item => {
-                                                        const key = `${rec.id}|${item}`;
-                                                        const sel = selectedItemsToReturn.includes(key);
-                                                        return (
-                                                            <div key={item} onClick={() => setSelectedItemsToReturn(sel ? selectedItemsToReturn.filter(k => k !== key) : [...selectedItemsToReturn, key])} className={`px-5 py-4 rounded-2xl border flex justify-between items-center cursor-pointer transition-all ${sel ? 'bg-emerald-50 border-emerald-300 shadow-inner' : 'bg-white border-slate-100'}`}>
-                                                                <span className="font-mono text-base font-bold text-slate-600 uppercase">{item}</span>
-                                                                <span>{sel ? '✅' : '⬜'}</span>
+                                        {activeRecords
+                                            .filter(r => (r.user.includes(returnSearchQuery) || r.items.some(i => i.includes(returnSearchQuery))))
+                                            .sort((a, b) => {
+                                                const overdueA = isOverdue(a.date);
+                                                const overdueB = isOverdue(b.date);
+                                                if (overdueA && !overdueB) return -1;
+                                                if (!overdueA && overdueB) return 1;
+                                                return new Date(b.date) - new Date(a.date);
+                                            })
+                                            .map(rec => {
+                                                const overdue = isOverdue(rec.date);
+                                                return (
+                                                    <div key={rec.id} className={`rounded-[2rem] border-2 p-5 bg-white shadow-sm transition-all ${overdue ? 'border-rose-100' : 'border-slate-100'}`}>
+                                                        <div className="flex justify-between items-start mb-3">
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={`font-black text-base px-4 py-1 rounded-xl w-fit ${overdue ? 'bg-rose-50 text-rose-800' : 'bg-slate-100 text-slate-800'}`}>{rec.user}</span>
+                                                                    {overdue && <span className="text-[10px] font-black text-white bg-rose-600 px-2 py-0.5 rounded-lg animate-pulse">逾期</span>}
+                                                                </div>
+                                                                <span className={`text-[11px] font-bold px-1 ${overdue ? 'text-rose-600' : 'text-slate-400'}`}>
+                                                                    借出日期：{new Date(rec.date).toLocaleDateString('zh-TW')}
+                                                                </span>
                                                             </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        ))}
+                                                            <button onClick={() => {
+                                                                const keys = rec.items.map(i => `${rec.id}|${i}`);
+                                                                const allSelected = keys.every(k => selectedItemsToReturn.includes(k));
+                                                                if(allSelected) setSelectedItemsToReturn(prev => prev.filter(k => !keys.includes(k)));
+                                                                else setSelectedItemsToReturn(prev => [...new Set([...prev, ...keys])]);
+                                                            }} className="text-sm font-bold text-blue-500 underline">全選</button>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 gap-2.5">
+                                                            {rec.items.map(item => {
+                                                                const key = `${rec.id}|${item}`;
+                                                                const sel = selectedItemsToReturn.includes(key);
+                                                                return (
+                                                                    <div key={item} onClick={() => setSelectedItemsToReturn(sel ? selectedItemsToReturn.filter(k => k !== key) : [...selectedItemsToReturn, key])} className={`px-5 py-4 rounded-2xl border flex justify-between items-center cursor-pointer transition-all ${sel ? 'bg-emerald-50 border-emerald-300 shadow-inner' : 'bg-white border-slate-100'}`}>
+                                                                        <span className="font-mono text-base font-bold text-slate-600 uppercase">{item}</span>
+                                                                        <span>{sel ? '✅' : '⬜'}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                        })}
                                     </div>
                                 </div>
                             </div>
@@ -490,39 +498,37 @@
                         {activeTab === 'in_use' && (
                             <div className="space-y-4 animate-in fade-in duration-300 pb-10">
                                 <div className="flex justify-between items-center px-2 py-2">
-                                    <div className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><i data-lucide="clock" className="w-4 h-4"></i>{showOnlyOverdue ? `逾期項目 (${overdueCount})` : `全部領用 (${activeRecords.length})`}</div>
+                                    <div className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                        <i data-lucide="clock" className="w-4 h-4"></i>{showOnlyOverdue ? `逾期項目 (${overduePeopleCount}人)` : `全部領用 (${usagePeopleCount}人)`}
+                                    </div>
                                     <button onClick={() => setShowOnlyOverdue(!showOnlyOverdue)} className={`px-5 py-2 rounded-full text-xs font-black transition-all flex items-center gap-1.5 shadow-sm ${showOnlyOverdue ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-500'}`}>{showOnlyOverdue ? "顯示全部" : "只看逾期"}</button>
                                 </div>
-                                {displayedActiveRecords.length === 0 ? (
-                                    <div className="text-center py-20 text-slate-300 font-black italic">{showOnlyOverdue ? "目前沒有逾期項目 🎉" : "目前無領用中的紀錄"}</div>
-                                ) : (
-                                    displayedActiveRecords.map(rec => {
-                                        const overdue = isOverdue(rec.date);
-                                        const daysUsed = Math.floor(Math.abs(new Date() - new Date(rec.date)) / (1000 * 60 * 60 * 24));
-                                        return (
-                                            <div key={rec.id} className={`bg-white rounded-[2rem] p-6 border-l-[12px] shadow-sm transition-all ${overdue ? 'border-rose-600 bg-rose-50/10' : 'border-blue-600'}`}>
-                                                <div className="flex justify-between items-center mb-5">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <span className={`px-5 py-1.5 rounded-xl font-black text-base ${overdue ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>{rec.user}</span>
-                                                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg ${overdue ? 'bg-rose-500 text-white animate-pulse' : 'bg-blue-500 text-white'}`}>{overdue ? '流浪中' : '工作中'}</span>
-                                                    </div>
-                                                    {overdue && <i data-lucide="alert-triangle" className="text-rose-600 w-6 h-6"></i>}
+                                {displayedActiveRecords.map(rec => {
+                                    const overdue = isOverdue(rec.date);
+                                    const daysUsed = Math.floor(Math.abs(new Date() - new Date(rec.date)) / (1000 * 60 * 60 * 24));
+                                    return (
+                                        <div key={rec.id} className={`bg-white rounded-[2rem] p-6 border-l-[12px] shadow-sm transition-all ${overdue ? 'border-rose-600 bg-rose-50/10' : 'border-blue-600'}`}>
+                                            <div className="flex justify-between items-center mb-5">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className={`px-5 py-1.5 rounded-xl font-black text-base ${overdue ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>{rec.user}</span>
+                                                    <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg ${overdue ? 'bg-rose-500 text-white animate-pulse' : 'bg-blue-500 text-white'}`}>{overdue ? '流浪中' : '工作中'}</span>
                                                 </div>
-                                                <div className="flex flex-wrap gap-2.5 mb-5">{rec.items.map(i => <span key={i} className="px-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono font-bold text-slate-600 uppercase">{i}</span>)}</div>
-                                                <div className="text-xs font-black text-slate-400 border-t border-slate-50 pt-5 flex justify-between items-center">
-                                                    <div className="flex items-center gap-1.5 font-bold"><i data-lucide="calendar" className="w-4 h-4"></i>已領用 {daysUsed} 天</div>
-                                                    <div className="flex gap-2.5">
-                                                        {overdue && <button onClick={() => {
-                                                            const text = `嗨 ${rec.user}，溫馨提醒您領用的 Socket 編號 (${rec.items.join(', ')}) 已經在外面流浪約 ${daysUsed} 天了，若工程已結束，記得歸還喔！辛苦了，謝謝！`;
-                                                            const el = document.createElement('textarea'); el.value = text; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); showToast('提醒文字已複製');
-                                                        }} className="bg-amber-100 text-amber-700 px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 active:bg-amber-200 border border-amber-200 shadow-sm"><i data-lucide="send" className="w-4 h-4"></i> 溫馨提醒</button>}
-                                                        <button onClick={() => { setActiveTab('return'); setReturnSearchQuery(rec.user); }} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 uppercase shadow-md active:bg-slate-700 transition-all">前往歸還</button>
-                                                    </div>
+                                                {overdue && <i data-lucide="alert-triangle" className="text-rose-600" size={24}></i>}
+                                            </div>
+                                            <div className="flex flex-wrap gap-2.5 mb-5">{rec.items.map(i => <span key={i} className="px-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono font-bold text-slate-600 uppercase">{i}</span>)}</div>
+                                            <div className="text-xs font-black text-slate-400 border-t border-slate-50 pt-5 flex justify-between items-center">
+                                                <div className="flex items-center gap-1.5 font-bold"><i data-lucide="calendar" className="w-4 h-4"></i>已領用 {daysUsed} 天</div>
+                                                <div className="flex gap-2.5">
+                                                    {overdue && <button onClick={() => {
+                                                        const text = `嗨 ${rec.user}，溫馨提醒您領用的 Socket 編號 (${rec.items.join(', ')}) 已經在外面流浪約 ${daysUsed} 天了，若工程已結束，記得歸還喔！辛苦了，謝謝！`;
+                                                        const el = document.createElement('textarea'); el.value = text; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); showToast('提醒文字已複製');
+                                                    }} className="bg-amber-100 text-amber-700 px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 active:bg-amber-200 border border-amber-200 shadow-sm"><i data-lucide="send" className="w-4 h-4"></i> 溫馨提醒</button>}
+                                                    <button onClick={() => { setActiveTab('return'); setReturnSearchQuery(rec.user); }} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 uppercase shadow-md active:bg-slate-700 transition-all">前往歸還</button>
                                                 </div>
                                             </div>
-                                        );
-                                    })
-                                )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
 
@@ -533,18 +539,20 @@
                                         <i data-lucide="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5" />
                                         <input type="text" className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 outline-none focus:border-blue-500 font-bold text-base shadow-inner transition-all" placeholder="搜尋姓名或編號..." value={historySearchTerm} onChange={e => setHistorySearchTerm(e.target.value)} />
                                     </div>
-                                    <div className="space-y-3">
-                                        <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-4">
+                                        <div className="flex flex-col gap-3">
                                             <div className="space-y-1.5">
-                                                <label className="text-[11px] font-black text-slate-400 uppercase ml-2">開始日期</label>
-                                                <input type="date" className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-blue-500" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                                                <label className="text-[11px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1"><i data-lucide="calendar" className="w-3 h-3"></i> 開始日期</label>
+                                                <input type="date" className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-base font-bold outline-none focus:border-blue-500" value={startDate} onChange={e => setStartDate(e.target.value)} />
                                             </div>
                                             <div className="space-y-1.5">
-                                                <label className="text-[11px] font-black text-slate-400 uppercase ml-2">結束日期</label>
-                                                <input type="date" className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-blue-500" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                                                <label className="text-[11px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1"><i data-lucide="calendar-check" className="w-3 h-3"></i> 結束日期</label>
+                                                <input type="date" className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-base font-bold outline-none focus:border-blue-500" value={endDate} onChange={e => setEndDate(e.target.value)} />
                                             </div>
                                         </div>
-                                        <button onClick={exportCSV} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2.5 active:bg-slate-700 transition-all shadow-md"><i data-lucide="file-spreadsheet" className="w-5 h-5 text-green-400"></i> 匯出篩選清單 (CSV)</button>
+                                        <button onClick={exportCSV} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2.5 active:bg-slate-700 transition-all shadow-md mt-2">
+                                            <i data-lucide="file-spreadsheet" className="w-5 h-5 text-green-400"></i> 匯出篩選清單 (CSV)
+                                        </button>
                                     </div>
                                 </div>
                                 {groupedHistory.map(g => (
@@ -578,15 +586,15 @@
                                 <span className="text-xl font-black text-slate-700 leading-none">{totalItemsLent}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter leading-tight">使用中</span>
-                                <span className="text-xl font-black text-blue-700 leading-none">{activeRecords.length}</span>
+                                <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter leading-tight text-rose-600">逾期數量</span>
+                                <span className={`text-xl font-black leading-none ${overdueItemsCount > 0 ? 'text-rose-600' : 'text-slate-700'}`}>{overdueItemsCount}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter leading-tight">逾期</span>
-                                <span className={`text-xl font-black leading-none ${overdueCount > 0 ? 'text-rose-600' : 'text-slate-200'}`}>{overdueCount}</span>
+                                <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter leading-tight text-blue-700">使用人員</span>
+                                <span className="text-xl font-black text-blue-700 leading-none">{usagePeopleCount}</span>
                             </div>
                         </div>
-                        <div className="text-[9px] font-black text-slate-300 italic tracking-tighter uppercase text-right">Socket Final V9.9</div>
+                        <div className="text-[9px] font-black text-slate-300 italic tracking-tighter uppercase text-right leading-tight">Socket<br/>V10.8 Final</div>
                     </footer>
                 </div>
             );
