@@ -38,10 +38,10 @@
         }
         .icon-wrapper { display: inline-flex; align-items: center; justify-content: center; }
 
-        /* 跑馬燈動畫樣式 - 調整速度為 25s (更慢更清楚) */
-        @keyframes marquee {
-            0% { transform: translateX(100%); }
-            100% { transform: translateX(-150%); }
+        /* 左右彈跳跑馬燈動畫樣式 */
+        @keyframes marquee-bounce {
+            0% { transform: translateX(20%); }
+            100% { transform: translateX(-20%); }
         }
         .marquee-box {
             overflow: hidden;
@@ -52,8 +52,9 @@
         }
         .marquee-text {
             display: inline-block;
-            animation: marquee 25s linear infinite;
-            padding-left: 10px;
+            /* 使用 alternate 實現左右來回彈跳跑，速度調快一點點增加律動感 */
+            animation: marquee-bounce 6s ease-in-out infinite alternate;
+            padding: 0 10px;
         }
     </style>
 </head>
@@ -159,7 +160,6 @@
             
             const activeRecords = useMemo(() => records.filter(r => r.status === 'Checked Out'), [records]);
             
-            // 統計數據
             const usagePeopleCount = activeRecords.length;
             const overduePeopleCount = useMemo(() => activeRecords.filter(r => isOverdue(r.date)).length, [activeRecords]);
             const totalItemsLent = useMemo(() => activeRecords.reduce((acc, rec) => acc + (rec.items?.length || 0), 0), [activeRecords]);
@@ -468,10 +468,10 @@
                             <div className="space-y-4 animate-in fade-in duration-300 pb-10">
                                 <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border-t-8 border-emerald-500 border border-slate-200">
                                     <div className="flex flex-col gap-4 mb-6">
-                                        {/* 跑馬燈區域 - 已減速至 25s */}
+                                        {/* 修正：實現來回彈跳模式的跑馬燈提醒語區域 */}
                                         <div className="marquee-box bg-rose-50 rounded-xl py-2.5 border border-rose-100">
                                             <div className="marquee-text text-[12px] font-black text-rose-600">
-                                                ⚠️ 溫馨提醒：歸還請務必放置於歸還箱，感謝您的配合～ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ⚠️ 溫馨提醒：歸還請務必放置於歸還箱，感謝您的配合～
+                                                ⚠️ 溫馨提醒：歸還請務必放置於歸還箱，感謝您的配合～
                                             </div>
                                         </div>
                                         
@@ -648,7 +648,7 @@
                             <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter leading-tight text-rose-600">逾期數量</span><span className={`text-xl font-black leading-none ${overdueItemsCount > 0 ? 'text-rose-600' : 'text-slate-700'}`}>{overdueItemsCount}</span></div>
                             <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter leading-tight text-blue-700">使用人員</span><span className="text-xl font-black text-blue-700 leading-none">{usagePeopleCount}</span></div>
                         </div>
-                        <div className="text-[9px] font-black text-slate-300 italic tracking-tighter uppercase text-right leading-tight">Socket<br/>V12.4 Final</div>
+                        <div className="text-[9px] font-black text-slate-300 italic tracking-tighter uppercase text-right leading-tight">Socket<br/>V12.5 Final</div>
                     </footer>
                 </div>
             );
