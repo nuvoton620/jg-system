@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SOCKET 工程使用紀錄</title>
-    <!-- 載入必要開發庫 -->
+    <!-- 載入穩定、高效的生產環境套件，杜絕加載錯誤 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
-    <!-- Firebase SDK Compat -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.12/babel.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    
+    <!-- Firebase 相容 SDK 載入 -->
     <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-auth-compat.js"></script>
@@ -38,7 +38,7 @@
         }
         .icon-wrapper { display: inline-flex; align-items: center; justify-content: center; }
 
-        /* 左右彈跳跑馬燈 */
+        /* 左右彈跳跑馬燈外觀 */
         @keyframes marquee-bounce {
             0% { transform: translateX(20%); }
             100% { transform: translateX(-20%); }
@@ -58,12 +58,51 @@
     </style>
 </head>
 <body>
+    
+    <!-- 🛡️ 貼心首創：全域錯誤防禦診斷面板 (預設隱藏，出事時會立刻顯示錯誤原因，拒絕空白畫面) -->
+    <div id="error-fallback" style="display:none;" className="p-6 m-4 bg-rose-50 border-2 border-rose-300 rounded-[2rem] text-rose-800 font-sans shadow-2xl relative z-[9999] max-w-md mx-auto">
+        <div className="flex items-center gap-3 mb-3 text-rose-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-8 h-8 shrink-0">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <h3 className="text-lg font-black tracking-tight">網頁載入發生錯誤 (Error Fallback)</h3>
+        </div>
+        <p className="text-xs font-bold text-rose-600 mb-4 leading-relaxed">請將以下紅框內的錯誤代碼複製給開發人員，或確認是否為公司內網防火牆阻擋了相關雲端資源：</p>
+        <pre id="error-message" className="bg-rose-100/80 p-4 rounded-2xl text-[11px] font-mono border border-rose-200 overflow-x-auto whitespace-pre-wrap leading-relaxed break-all"></pre>
+        <div className="mt-4 pt-3 border-t border-rose-200 flex justify-between items-center text-[10px] font-bold text-rose-500">
+            <span>SOCKET SYSTEM V15.4</span>
+            <button onClick="window.location.reload()" className="bg-rose-600 text-white px-3 py-1.5 rounded-lg active:scale-95 transition-transform">重新整理網頁</button>
+        </div>
+    </div>
+
+    <!-- 🌟 偵錯監聽指令碼：在任何 React / JS 掛掉時即時擷取錯誤 -->
+    <script>
+        var hasError = false;
+        function showFallbackError(errorMsg) {
+            hasError = true;
+            var fallback = document.getElementById('error-fallback');
+            var msgEl = document.getElementById('error-message');
+            if (fallback && msgEl) {
+                fallback.style.display = 'block';
+                msgEl.textContent += (msgEl.textContent ? '\n\n' : '') + errorMsg;
+            }
+        }
+        window.addEventListener('error', function(e) {
+            showFallbackError('❌ JavaScript Error:\n' + e.message + '\n📍 位置: ' + e.filename + ' (第 ' + e.lineno + ' 行)');
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            showFallbackError('❌ Unhandled Promise Rejection:\n' + (e.reason ? (e.reason.message || e.reason) : '未知拒絕原因'));
+        });
+    </script>
+
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useMemo, useEffect, useRef } = React;
 
-        // Firebase 配置
+        // Firebase 專案配置資訊
         const firebaseConfig = {
             apiKey: "AIzaSyBgUa7rlHF3pjyH3Wrmtu4KqOF5FoKdJVQ",
             authDomain: "socket-management-21bf2.firebaseapp.com",
@@ -74,18 +113,172 @@
             measurementId: "G-E97BVY2WB8"
         };
 
-        firebase.initializeApp(firebaseConfig);
+        // 🛡️ 核心修復：防止 Firebase 重複初始化導致網頁空白當機的防禦機制
+        let firebaseApp;
+        if (!firebase.apps.length) {
+            firebaseApp = firebase.initializeApp(firebaseConfig);
+        } else {
+            firebaseApp = firebase.app();
+        }
         const auth = firebase.auth();
         const db = firebase.firestore();
         const appId = "socket-management-21bf2";
 
-        const CheckIcon = ({ selected, color = "emerald" }) => {
-            if (selected) {
-                return (
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={`text-${color}-600`}>
+        // 自訂 React 原生高畫質 SVG 圖示元件 (徹底取代 Lucide-React，保證永久不因外部載入掛掉)
+        const Icon = ({ name, className = "w-6 h-6", ...props }) => {
+            const svgMap = {
+                lock: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                ),
+                eye: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                ),
+                "shield-check": (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        <path d="m9 11 2 2 4-4"></path>
+                    </svg>
+                ),
+                "party-popper": (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="M5.8 11.3 2 22l10.7-3.8"></path>
+                        <path d="M4 14h.01"></path>
+                        <path d="M17 14h.01"></path>
+                        <path d="M7 8h.01"></path>
+                        <path d="M13 6h.01"></path>
+                        <path d="M15 10h.01"></path>
+                        <path d="M11 12h.01"></path>
+                        <path d="M11 4h.01"></path>
+                        <path d="M18 6h.01"></path>
+                        <path d="M16 2h.01"></path>
+                    </svg>
+                ),
+                "qr-code": (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                        <path d="M7 7h.01"></path>
+                        <path d="M17 7h.01"></path>
+                        <path d="M7 17h.01"></path>
+                        <path d="M17 17h.01"></path>
+                    </svg>
+                ),
+                "alert-triangle": (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                ),
+                "check-circle-2": (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
+                        <path d="m9 12 2 2 4-4"></path>
+                    </svg>
+                ),
+                "trash-2": (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="M3 6h18"></path>
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                ),
+                search: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                ),
+                check: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
                         <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
-                );
+                ),
+                calendar: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="18" y2="10"></line>
+                    </svg>
+                ),
+                "calendar-days": (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="18" y2="10"></line>
+                        <path d="M8 14h.01"></path>
+                        <path d="M12 14h.01"></path>
+                        <path d="M16 14h.01"></path>
+                        <path d="M8 18h.01"></path>
+                        <path d="M12 18h.01"></path>
+                        <path d="M16 18h.01"></path>
+                    </svg>
+                ),
+                clock: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                ),
+                "log-out": (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                ),
+                "log-in": (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                        <polyline points="10 17 5 12 10 7"></polyline>
+                        <line x1="15" y1="12" x2="5" y2="12"></line>
+                    </svg>
+                ),
+                "file-spreadsheet": (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                ),
+                home: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                ),
+                heart: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path>
+                    </svg>
+                ),
+                x: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                )
+            };
+            return svgMap[name] || null;
+        };
+
+        const CheckIconComponent = ({ selected, color = "emerald" }) => {
+            if (selected) {
+                return <Icon name="check" className={`w-[22px] h-[22px] text-${color}-600`} />;
             }
             return <div className="w-[22px] h-[22px] border-2 border-slate-200 rounded-md bg-white"></div>;
         };
@@ -162,7 +355,7 @@
                 setTimeout(() => setToastMsg(''), 2500);
             };
 
-            // --- 3. 核心運算邏輯 (統計變數) ---
+            // --- 3. 核心運算邏輯 (統計與篩選變數定義) ---
             const activeRecords = useMemo(() => records.filter(r => r.status === 'Checked Out'), [records]);
             
             const usagePeopleCount = activeRecords.length;
@@ -219,15 +412,24 @@
             const addSocketToTemp = (code) => {
                 const socketId = code.trim().toUpperCase();
                 if (!socketId) return;
+
+                // 🚨 嚴格格式過濾防呆：必須為 SK 開頭
                 if (!socketId.startsWith('SK')) {
-                    setInputError('請確認Socket編號是否正確'); return;
+                    setInputError('請確認Socket編號是否正確');
+                    setTimeout(() => setInputError(''), 4000);
+                    return;
                 }
+
                 if (tempItems.includes(socketId)) {
-                    setInputError(`編號 ${socketId} 已在清單中`); return;
+                    setInputError(`編號 ${socketId} 已在清單中`);
+                    setTimeout(() => setInputError(''), 3000);
+                    return;
                 }
                 const owner = activeRecords.find(r => r.items.includes(socketId));
                 if (owner) {
-                    setInputError(`編號 ${socketId} 正被 ${owner.user} 領用`); return;
+                    setInputError(`編號 ${socketId} 正被 ${owner.user} 領用`);
+                    setTimeout(() => setInputError(''), 4000);
+                    return;
                 }
                 setTempItems(prev => [socketId, ...prev]); 
                 setFormData(prev => ({ ...prev, itemInput: '' }));
@@ -236,15 +438,17 @@
 
             const executeCheckout = async () => {
                 setShowOverdueModal(false);
-                const allowedDigits = '012356789';
+                const allowedDigits = '012356789'; // 剔除 4
                 let returnCode = '';
-                for (let i = 0; i < 4; i++) returnCode += allowedDigits.charAt(Math.floor(Math.random() * allowedDigits.length));
+                for (let i = 0; i < 4; i++) {
+                    returnCode += allowedDigits.charAt(Math.floor(Math.random() * allowedDigits.length));
+                }
                 try {
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records').add({
                         user: formData.user, empId: formData.empId, returnCode: returnCode, items: [...tempItems], date: new Date().toISOString(), status: 'Checked Out', createdAt: Date.now()
                     });
                     setCheckoutSuccessCode(returnCode); setFormData({ user: '', empId: '', itemInput: '' }); setTempItems([]);
-                } catch (err) { console.error(err); }
+                } catch (err) { console.error("Checkout write error:", err); }
             };
 
             const handleCheckoutClick = () => {
@@ -263,6 +467,8 @@
                 });
                 const firstRecordId = Object.keys(groups)[0];
                 const original = records.find(r => r.id === firstRecordId);
+                
+                // 比對驗證碼
                 if (returnVerifyCode !== original.returnCode) {
                     setVerifyError(true); setTimeout(() => setVerifyError(false), 1500); return;
                 }
@@ -272,8 +478,11 @@
                         const rec = records.find(r => r.id === rid);
                         const remaining = rec.items.filter(i => !selected.includes(i));
                         const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records').doc(rid);
-                        if (remaining.length === 0) await docRef.update({ status: 'Returned', returnDate: new Date().toISOString() });
-                        else {
+                        
+                        if (remaining.length === 0) {
+                            await docRef.update({ status: 'Returned', returnDate: new Date().toISOString() });
+                        } else {
+                            // 若部分歸還
                             await docRef.update({ items: remaining });
                             await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records').add({
                                 user: rec.user, empId: rec.empId, returnCode: rec.returnCode, items: selected, date: rec.date, status: 'Returned', returnDate: new Date().toISOString(), createdAt: Date.now()
@@ -281,7 +490,7 @@
                         }
                     }
                     setIsVerifyReturnOpen(false); setReturnVerifyCode(''); setSelectedItemsToReturn([]); setActiveTab('history'); showToast('歸還成功');
-                } catch (err) { console.error(err); }
+                } catch (err) { console.error("Return update error:", err); }
             };
 
             const toggleHistorySelection = (id) => setSelectedHistoryIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -291,7 +500,6 @@
                 setPendingDeleteIds([...selectedHistoryIds]); setIsDeleteModalOpen(true);
             };
 
-            // 修正點：報表更名為使用紀錄 (V15.0)
             const exportCSV = () => {
                 if (filteredHistoryRecords.length === 0) return;
                 const headers = ["領出日期", "歸還日期", "工號", "人員", "Socket", "借用小時"];
@@ -300,7 +508,8 @@
                     const hours = calculateHours(r.date, r.returnDate);
                     const checkoutTime = new Date(r.date).toLocaleString();
                     const returnTime = r.returnDate ? new Date(r.returnDate).toLocaleString() : "未歸還";
-                    csv += `"${checkoutTime}","${returnTime}","${maskEmpId(r.empId)}","${r.user}","${r.items.join(';')}","${hours}"\n`;
+                    const maskedId = maskEmpId(r.empId); // 安全遮罩
+                    csv += `"${checkoutTime}","${returnTime}","${maskedId}","${r.user}","${r.items.join(';')}","${hours}"\n`;
                 });
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
@@ -309,7 +518,6 @@
                 showToast('使用紀錄已匯出');
             };
 
-            // --- 5. 掃描器控制 ---
             const stopScanner = () => {
                 if (html5QrCodeRef.current) {
                     html5QrCodeRef.current.stop().then(() => {
@@ -335,9 +543,8 @@
                 }, 450);
             };
 
-            // --- 6. 核心效應監聽 ---
             useEffect(() => {
-                auth.signInAnonymously().catch(err => console.error("認證失敗", err));
+                auth.signInAnonymously().catch(err => console.error("Firebase 匿名驗證失敗:", err));
                 const unsubscribeAuth = auth.onAuthStateChanged((u) => setUser(u));
                 return () => unsubscribeAuth();
             }, []);
@@ -347,30 +554,24 @@
                 const recordsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records');
                 const unsubscribeData = recordsRef.onSnapshot((snapshot) => {
                     const dbData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    // 過濾排除測試用髒資料
                     const formalData = dbData.filter(r => !['測試', '無此人', '範例'].some(name => r.user?.includes(name)));
                     setRecords(formalData.sort((a, b) => new Date(b.date) - new Date(a.date)));
                     setLoading(false);
-                }, (error) => console.error("資料獲取失敗", error));
+                }, (error) => console.error("Firestore 資料即時監聽異常:", error));
                 return () => unsubscribeData();
             }, [user]);
 
-            useEffect(() => {
-                const timer = setTimeout(() => {
-                    if (window.lucide) window.lucide.createIcons();
-                }, 100);
-                return () => clearTimeout(timer);
-            }, [activeTab, showScanner, records, isPageLocked, toastMsg, showOverdueModal, tempItems, selectedHistoryIds, checkoutSuccessCode, isVerifyReturnOpen, isAdminMode]);
-
-            // --- 7. UI 渲染 ---
+            // 🌟 網頁入口通行鎖
             if (isPageLocked) {
                 return (
                     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-8 text-center text-white">
                         <div className="bg-white/10 w-24 h-24 rounded-3xl flex items-center justify-center mb-8 border border-white/20 backdrop-blur-xl">
-                            <span className="icon-wrapper"><i data-lucide="lock" className="w-14 h-14"></i></span>
+                            <span className="icon-wrapper"><Icon name="lock" className="w-14 h-14 text-white" /></span>
                         </div>
                         <h1 className="text-3xl font-black mb-4 tracking-tight uppercase">SOCKET 管理系統</h1>
                         <p className="text-slate-400 mb-10 text-sm font-bold tracking-widest leading-loose">Engineering Dept Only</p>
-                        <div className="w-full max-w-xs space-y-4">
+                        <div className="w-full max-w-xs space-y-4 text-slate-800">
                             <input 
                                 type="text" inputMode="numeric" pattern="[0-9]*"
                                 className={`w-full bg-white/5 border-2 rounded-2xl py-6 text-center text-4xl font-black tracking-widest text-white outline-none transition-all ${passwordError ? 'border-rose-500 animate-shake' : 'border-white/10 focus:border-blue-500'}`} 
@@ -378,7 +579,7 @@
                                 onChange={(e) => { setEntryPassword(e.target.value); setPasswordError(false); }}
                                 onKeyPress={(e) => e.key === 'Enter' && handleEntry()}
                             />
-                            <button onClick={handleEntry} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all">進入系統</button>
+                            <button onClick={handleEntry} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all text-white">進入系統</button>
                         </div>
                     </div>
                 );
@@ -387,33 +588,34 @@
             return (
                 <div className="min-h-screen bg-slate-50 flex flex-col max-w-md mx-auto shadow-2xl pb-24 font-sans relative border-x border-slate-200 overflow-x-hidden">
                     
+                    {/* Toast 訊息 */}
                     {toastMsg && (
                         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-slate-800/95 backdrop-blur-sm text-white px-8 py-5 rounded-[2rem] text-base font-black shadow-2xl animate-toast flex items-center justify-center gap-3 min-w-[300px]">
-                            <span className="icon-wrapper"><i data-lucide="check-circle-2" className="w-6 h-6 text-green-400"></i></span>
+                            <span className="icon-wrapper"><Icon name="check-circle-2" className="w-6 h-6 text-green-400" /></span>
                             <span>{toastMsg}</span>
                         </div>
                     )}
 
-                    {/* Modal: 管理員登入 */}
+                    {/* 管理員解鎖彈窗 */}
                     {isAdminModalOpen && (
                         <div className="fixed inset-0 z-[210] flex items-center justify-center p-6 bg-slate-900/90 backdrop-blur-md text-slate-800">
                             <div className="bg-white rounded-[2rem] p-8 w-full max-w-xs shadow-2xl text-center space-y-6">
-                                <div className="text-blue-600 flex justify-center"><span className="icon-wrapper"><i data-lucide="eye" className="w-14 h-14"></i></span></div>
+                                <div className="text-blue-600 flex justify-center"><span className="icon-wrapper"><Icon name="eye" className="w-14 h-14" /></span></div>
                                 <h3 className="text-xl font-black">解鎖完整資訊</h3>
                                 <input type="text" inputMode="numeric" pattern="[0-9]*" className={`w-full bg-slate-50 border-2 rounded-2xl py-4 text-center text-3xl font-black tracking-widest outline-none ${passwordError ? 'border-rose-500 bg-rose-50' : 'border-slate-200 focus:border-blue-600'}`} placeholder="管理密碼" value={adminInputPassword} onChange={(e) => {setAdminInputPassword(e.target.value); setPasswordError(false);}} />
                                 <div className="grid grid-cols-2 gap-3">
                                     <button onClick={() => {setIsAdminModalOpen(false); setAdminInputPassword('');}} className="py-3 bg-slate-100 text-slate-500 rounded-2xl font-black">取消</button>
-                                    <button onClick={handleAdminLogin} className="py-3 bg-blue-600 text-white rounded-2xl font-black shadow-lg">解鎖</button>
+                                    <button onClick={handleAdminLogin} className="py-3 bg-blue-600 text-white rounded-2xl font-black shadow-lg text-white">解鎖</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Modal: 歸還驗證 */}
+                    {/* 歸還碼密碼驗證彈窗 */}
                     {isVerifyReturnOpen && (
                         <div className="fixed inset-0 z-[180] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
-                            <div className="bg-white rounded-[2rem] p-8 w-full max-w-[300px] shadow-2xl text-center space-y-6 animate-in zoom-in-95">
-                                <div className="text-blue-600 flex justify-center"><span className="icon-wrapper"><i data-lucide="shield-check" className="w-14 h-14"></i></span></div>
+                            <div className="bg-white rounded-[2rem] p-8 w-full max-w-[300px] shadow-2xl text-center space-y-6 animate-in zoom-in-95 duration-200">
+                                <div className="text-blue-600 flex justify-center"><span className="icon-wrapper"><Icon name="shield-check" className="w-14 h-14" /></span></div>
                                 <div className="space-y-2 text-center text-slate-800">
                                     <h3 className="text-xl font-black">歸還碼比對</h3>
                                     <p className="text-xs font-bold text-slate-400">請輸入領出時系統生成的 4 位數密碼</p>
@@ -421,29 +623,29 @@
                                 <input type="text" inputMode="numeric" maxLength="4" className={`w-full bg-slate-50 border-2 rounded-2xl py-5 text-center text-5xl font-black tracking-[1rem] outline-none transition-all ${verifyError ? 'border-rose-500 animate-shake' : 'border-slate-200 focus:border-blue-600'}`} placeholder="0000" value={returnVerifyCode} onChange={(e) => {setReturnVerifyCode(e.target.value); setVerifyError(false);}} />
                                 <div className="grid grid-cols-2 gap-3">
                                     <button onClick={() => {setIsVerifyReturnOpen(false); setReturnVerifyCode('');}} className="py-4 bg-slate-100 text-slate-500 rounded-2xl font-black">取消</button>
-                                    <button onClick={executeReturnVerify} className="py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg">確認歸還</button>
+                                    <button onClick={executeReturnVerify} className="py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg text-white">確認歸還</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Modal: 登記成功 */}
+                    {/* 登記成功專屬驗證碼通知 */}
                     {checkoutSuccessCode && (
                         <div className="fixed inset-0 z-[190] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md text-slate-800">
                             <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-[320px] shadow-2xl text-center space-y-6 animate-in zoom-in-95">
-                                <div className="text-green-500 flex justify-center scale-125"><span className="icon-wrapper"><i data-lucide="party-popper" className="w-12 h-12"></i></span></div>
+                                <div className="text-green-500 flex justify-center scale-125"><span className="icon-wrapper"><Icon name="party-popper" className="w-12 h-12" /></span></div>
                                 <div className="space-y-3">
                                     <h3 className="text-2xl font-black text-center">登記成功！</h3>
                                     <p className="text-sm font-bold text-slate-500 text-center">您的專屬歸還密碼為：</p>
                                     <div className="bg-slate-900 text-white py-6 rounded-3xl text-5xl font-black tracking-widest shadow-inner mb-2">{checkoutSuccessCode}</div>
                                     <p className="text-xs font-black text-rose-500 text-center leading-relaxed">⚠️ 請務必記住此號碼，<br/>否則將無法自行歸還。</p>
                                 </div>
-                                <button onClick={() => { setCheckoutSuccessCode(null); setActiveTab('in_use'); }} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform">我記住了</button>
+                                <button onClick={() => { setCheckoutSuccessCode(null); setActiveTab('in_use'); }} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform text-white">我記住了</button>
                             </div>
                         </div>
                     )}
 
-                    {/* Modal: 刪除紀錄驗證 */}
+                    {/* 刪除歷史紀錄對話盒 */}
                     {isDeleteModalOpen && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md text-slate-800">
                             <div className="bg-white rounded-[1.8rem] p-6 w-[82%] max-w-[260px] shadow-2xl space-y-5 text-center">
@@ -458,39 +660,45 @@
                                             setIsDeleteModalOpen(false); setDeletePassword(''); setSelectedHistoryIds([]); showToast('紀錄已刪除');
                                             setIsAdminMode(true);
                                         } else setPasswordError(true);
-                                    }} className="py-3 bg-rose-600 text-white rounded-2xl font-black shadow-lg text-base">確認</button>
+                                    }} className="py-3 bg-rose-600 text-white rounded-2xl font-black shadow-lg text-base text-white">確認</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
+                    {/* 逾期未還強制提醒 */}
                     {showOverdueModal && (
                         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
                             <div className="bg-white rounded-[2rem] p-6 w-[85%] shadow-2xl text-center space-y-4">
                                 <div className="text-rose-500 flex justify-center">
-                                    <div className="relative"><span className="icon-wrapper"><i data-lucide="home" className="opacity-10 w-16 h-16 text-slate-800"></i></span><span className="icon-wrapper absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-rose-500"><i data-lucide="heart" className="fill-rose-500 w-10 h-10"></i></span></div>
+                                    <div className="relative">
+                                        <span className="icon-wrapper"><Icon name="home" className="opacity-10 w-16 h-16 text-slate-800" /></span>
+                                        <span className="icon-wrapper absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-rose-500"><Icon name="heart" className="fill-rose-500 w-10 h-10" /></span>
+                                    </div>
                                 </div>
                                 <div className="space-y-2 text-slate-800">
                                     <h3 className="text-xl font-black">溫馨提醒</h3>
                                     <p className="text-base font-bold leading-snug">嗨 {formData.user}，您的 Socket 流浪太久了，<br/><span className="text-rose-600 font-black underline decoration-2">記得先帶它回家（歸還）</span>喔！</p>
                                 </div>
                                 <div className="flex flex-col gap-2 pt-2">
-                                    <button onClick={() => { setShowOverdueModal(false); setActiveTab('return'); setReturnSearchQuery(formData.user.toUpperCase()); }} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black shadow-lg text-xl active:scale-95 transition-transform">好，先去歸還</button>
-                                    <button onClick={executeCheckout} className="text-slate-400 font-bold text-xs underline decoration-dotted py-2">仍要領用</button>
+                                    <button onClick={() => { setShowOverdueModal(false); setActiveTab('return'); setReturnSearchQuery(formData.user.toUpperCase()); }} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black shadow-lg text-xl active:scale-95 transition-transform text-white">好，先去歸還</button>
+                                    <button onClick={executeCheckout} className="text-slate-400 font-bold text-sm underline decoration-dotted py-2">仍要領用</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
+                    {/* 相機掃描框遮罩 */}
                     {showScanner && (
                         <div className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-center p-6">
                             <div className="w-full max-w-sm relative text-center">
-                                <button onClick={stopScanner} className="absolute -top-16 right-0 text-white p-4 bg-white/10 rounded-full"><span className="icon-wrapper"><i data-lucide="x" className="w-10 h-10"></i></span></button>
+                                <button onClick={stopScanner} className="absolute -top-16 right-0 text-white p-4 bg-white/10 rounded-full"><span className="icon-wrapper"><Icon name="x" className="w-10 h-10" /></span></button>
                                 <div id="reader" className="w-full rounded-3xl overflow-hidden border-4 border-blue-500 shadow-2xl bg-slate-900"></div>
                             </div>
                         </div>
                     )}
 
+                    {/* 頂部標題列 */}
                     <header className="glass-header text-white p-6 sticky top-0 z-20 shadow-xl flex justify-between items-center border-b border-white/10">
                         <h1 className="text-xl font-black tracking-tight uppercase">SOCKET 工程使用紀錄</h1>
                         <div className="flex flex-col items-end">
@@ -500,39 +708,43 @@
                         </div>
                     </header>
 
+                    {/* 分頁選單列 */}
                     <nav className="flex bg-white border-b sticky top-[72px] z-10 shadow-sm">
                         {[{ id: 'checkout', label: '領出', icon: 'log-out' }, { id: 'return', label: '歸還', icon: 'log-in' }, { id: 'in_use', label: '使用中', icon: 'clock' }, { id: 'history', label: '歷史', icon: 'history' }].map((tab) => (
                             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 py-4 text-sm font-black transition-all flex flex-col items-center relative ${activeTab === tab.id ? 'text-blue-700 bg-blue-50/50' : 'text-slate-400'}`}>
-                                <span className="icon-wrapper mb-1"><i data-lucide={tab.icon} className="w-6 h-6"></i></span> {tab.label}
+                                <span className="icon-wrapper mb-1"><Icon name={tab.icon} className="w-6 h-6" /></span> {tab.label}
                                 {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-blue-700 rounded-t-full" />}
                             </button>
                         ))}
                     </nav>
 
+                    {/* 主工作區內容 */}
                     <main className="p-4 flex-1 overflow-y-auto no-scrollbar">
+                        
+                        {/* 1. 領出登記分頁 */}
                         {activeTab === 'checkout' && (
                             <div className="space-y-4 animate-in fade-in duration-300 pb-10">
                                 <div className="bg-white p-5 sm:p-7 rounded-[2.5rem] shadow-sm border border-slate-200 text-slate-800">
                                     <div className="grid grid-cols-2 gap-4 mb-8">
                                         <div className="space-y-2 text-center">
-                                            <label className="text-slate-400 font-black text-xs uppercase block">領用人姓名</label>
+                                            <label className="text-slate-400 font-black text-xs uppercase block text-center">領用人姓名</label>
                                             <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-bold outline-none focus:border-blue-600 uppercase text-center" placeholder="姓名" value={formData.user} onChange={(e) => setFormData({...formData, user: e.target.value.toUpperCase()})} />
                                         </div>
                                         <div className="space-y-2 text-center">
-                                            <label className="text-slate-400 font-black text-xs uppercase block">工號</label>
+                                            <label className="text-slate-400 font-black text-xs uppercase block text-center">工號</label>
                                             <input type="text" inputMode="numeric" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-bold outline-none focus:border-blue-600 uppercase text-center" placeholder="7位數" value={formData.empId} onChange={(e) => setFormData({...formData, empId: e.target.value.toUpperCase()})} />
                                         </div>
                                     </div>
                                     <div className="flex justify-between items-center mb-4 px-1">
                                         <label className="text-slate-400 font-black text-xs uppercase">領用編號輸入</label>
-                                        <button onClick={() => startScanner('checkout')} className="px-6 py-2.5 bg-blue-600 text-white rounded-xl shadow-lg text-sm font-black flex items-center gap-1.5 active:scale-95 transition-all"><span className="icon-wrapper"><i data-lucide="qr-code" className="w-5 h-5"></i></span> 掃描</button>
+                                        <button onClick={() => startScanner('checkout')} className="px-6 py-2.5 bg-blue-600 text-white rounded-xl shadow-lg text-sm font-black flex items-center gap-1.5 active:scale-95 transition-all text-white"><span className="icon-wrapper"><Icon name="qr-code" className="w-5 h-5" /></span> 掃描</button>
                                     </div>
                                     <div className="h-7 mb-1 text-center">
-                                        {inputError && <p className="text-rose-500 text-xs font-black flex items-center justify-center gap-1.5 animate-pulse"><span className="icon-wrapper"><i data-lucide="alert-triangle" className="w-4 h-4"></i></span> {inputError}</p>}
+                                        {inputError && <p className="text-rose-500 text-xs font-black flex items-center justify-center gap-1.5 animate-pulse"><span className="icon-wrapper"><Icon name="alert-triangle" className="w-4 h-4" /></span> {inputError}</p>}
                                     </div>
                                     <div className="flex items-center gap-3 mb-8 px-1 overflow-hidden">
                                         <input type="text" className={`flex-1 min-w-0 bg-slate-50 border-2 rounded-2xl px-5 py-4 text-base font-bold outline-none transition-all uppercase ${inputError ? 'border-rose-500 bg-rose-50' : 'border-slate-100 focus:border-blue-600'}`} placeholder="輸入SK編號..." value={formData.itemInput} onChange={(e) => {setFormData({...formData, itemInput: e.target.value.toUpperCase()}); setInputError('');}} onKeyPress={(e) => e.key === 'Enter' && addSocketToTemp(formData.itemInput)} />
-                                        <button onClick={() => addSocketToTemp(formData.itemInput)} className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex-none flex items-center justify-center font-bold text-3xl shadow-md active:scale-90">+</button>
+                                        <button onClick={() => addSocketToTemp(formData.itemInput)} className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex-none flex items-center justify-center font-bold text-3xl shadow-md active:scale-90 text-white">+</button>
                                     </div>
                                     <div className="flex justify-between items-center mb-4 px-1">
                                         <label className="text-slate-400 font-black text-xs uppercase flex items-center gap-2">待登記清單 <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">{tempItems.length}</span></label>
@@ -541,16 +753,17 @@
                                         {tempItems.map((item, i) => (
                                             <div key={item + i} className="flex justify-between items-center px-5 py-4 rounded-2xl border bg-blue-50/50 border-blue-100 animate-in zoom-in-95">
                                                 <span className="font-mono font-black text-lg uppercase text-blue-900">{item}</span>
-                                                <button onClick={() => setTempItems(prev => prev.filter((_, idx) => idx !== i))} className="text-rose-400 p-2 active:scale-90 ml-2"><span className="icon-wrapper"><i data-lucide="trash-2" className="w-6 h-6"></i></span></button>
+                                                <button onClick={() => setTempItems(prev => prev.filter((_, idx) => idx !== i))} className="text-rose-400 p-2 active:scale-90 ml-2"><span className="icon-wrapper"><Icon name="trash-2" className="w-6 h-6" /></span></button>
                                             </div>
                                         ))}
                                         {tempItems.length === 0 && <div className="py-12 text-center text-slate-300 font-black italic border-2 border-dashed border-slate-100 rounded-2xl text-sm">目前清單為空</div>}
                                     </div>
-                                    <button disabled={tempItems.length === 0 || !formData.user || !formData.empId} onClick={handleCheckoutClick} className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black text-xl shadow-xl active:scale-[0.98] disabled:bg-slate-100 disabled:text-slate-300 flex items-center justify-center gap-3 transition-all"><span className="icon-wrapper"><i data-lucide="check-circle-2" className="w-7 h-7"></i></span> 確認登記領出</button>
+                                    <button disabled={tempItems.length === 0 || !formData.user || !formData.empId} onClick={handleCheckoutClick} className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black text-xl shadow-xl active:scale-[0.98] disabled:bg-slate-100 disabled:text-slate-300 flex items-center justify-center gap-3 transition-all text-white"><span className="icon-wrapper"><Icon name="check-circle-2" className="w-7 h-7" /></span> 確認登記領出</button>
                                 </div>
                             </div>
                         )}
 
+                        {/* 2. 歸還登記分頁 */}
                         {activeTab === 'return' && (
                             <div className="space-y-4 animate-in fade-in duration-300 pb-10">
                                 <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border-t-8 border-emerald-500 border border-slate-200 text-slate-800">
@@ -559,12 +772,12 @@
                                             <div className="marquee-text text-[12px] font-black text-rose-600">⚠️ 溫馨提醒：歸還請務必放置於歸還箱，感謝您的配合～</div>
                                         </div>
                                         <div className="flex justify-end gap-2 shrink-0">
-                                            <button onClick={() => startScanner('return')} className="px-6 py-2.5 bg-blue-600 text-white rounded-xl shadow-lg text-sm font-black flex items-center gap-1.5 active:scale-95 transition-all"><span className="icon-wrapper"><i data-lucide="qr-code" className="w-5 h-5"></i></span> 掃描</button>
-                                            <button disabled={selectedItemsToReturn.length === 0} onClick={() => { if (selectedItemsToReturn.length > 0) setIsVerifyReturnOpen(true); }} className={`px-5 py-2.5 rounded-xl font-black text-sm shadow-lg flex items-center gap-2 transition-all active:scale-95 ${selectedItemsToReturn.length > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-300'}`}><span className="icon-wrapper"><i data-lucide="package-check" className="w-5 h-5"></i></span> 執行歸還 ({selectedItemsToReturn.length})</button>
+                                            <button onClick={() => startScanner('return')} className="px-6 py-2.5 bg-blue-600 text-white rounded-xl shadow-lg text-sm font-black flex items-center gap-1.5 active:scale-95 transition-all text-white"><span className="icon-wrapper"><Icon name="qr-code" className="w-5 h-5" /></span> 掃描</button>
+                                            <button disabled={selectedItemsToReturn.length === 0} onClick={handleReturnClick} className={`px-5 py-2.5 rounded-xl font-black text-sm shadow-lg flex items-center gap-2 transition-all active:scale-95 ${selectedItemsToReturn.length > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-300'}`}><span className="icon-wrapper"><Icon name="check-circle-2" className="w-5 h-5" /></span> 執行歸還 ({selectedItemsToReturn.length})</button>
                                         </div>
                                     </div>
                                     <div className="relative mb-6">
-                                        <span className="icon-wrapper absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"><i data-lucide="search" className="w-5 h-5"></i></span>
+                                        <span className="icon-wrapper absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"><Icon name="search" className="w-5 h-5" /></span>
                                         <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-5 text-base font-bold outline-none focus:border-emerald-600 transition-all uppercase" placeholder="搜尋人名、編號或工號..." value={returnSearchQuery} onChange={(e) => setReturnSearchQuery(e.target.value.toUpperCase())} />
                                     </div>
                                     <div className="space-y-4 min-h-[200px] no-scrollbar">
@@ -586,7 +799,7 @@
                                                         return (
                                                             <div key={item} onClick={() => setSelectedItemsToReturn(sel ? selectedItemsToReturn.filter(k => k !== key) : [...selectedItemsToReturn, key])} className={`px-5 py-4 rounded-2xl border flex justify-between items-center cursor-pointer transition-all ${sel ? 'bg-emerald-50 border-emerald-300 shadow-inner' : 'bg-white border-slate-100'}`}>
                                                                 <span className="font-mono text-base font-bold text-slate-600 uppercase">{item}</span>
-                                                                <span className="icon-wrapper"><CheckIcon selected={sel} /></span>
+                                                                <span className="icon-wrapper"><CheckIconComponent selected={sel} /></span>
                                                             </div>
                                                         );
                                                     })}
@@ -598,41 +811,47 @@
                             </div>
                         )}
 
+                        {/* 3. 當前領用中使用中分頁 */}
                         {activeTab === 'in_use' && (
                             <div className="space-y-4 animate-in fade-in duration-300 pb-10 text-slate-800">
                                 <div className="flex justify-between items-center px-2 py-2">
-                                    <div className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><span className="icon-wrapper"><i data-lucide="clock" className="w-4 h-4"></i></span>全部領用 ({activeRecords.length})</div>
+                                    <div className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><span className="icon-wrapper"><Icon name="clock" className="w-4 h-4" /></span>全部領用 ({activeRecords.length})</div>
                                     <button onClick={() => setShowOnlyOverdue(!showOnlyOverdue)} className={`px-5 py-2 rounded-full text-xs font-black shadow-sm ${showOnlyOverdue ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-500'}`}>{showOnlyOverdue ? "顯示全部" : "只看逾期"}</button>
                                 </div>
-                                {displayedActiveRecords.map(rec => (
-                                    <div key={rec.id} className={`bg-white rounded-[2rem] p-6 border-l-[12px] shadow-sm transition-all ${isOverdue(rec.date) ? 'border-rose-600 bg-rose-50/10' : 'border-blue-600'}`}>
-                                        <div className="flex justify-between items-center mb-5">
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-2.5">
-                                                    <span className={`px-5 py-1.5 rounded-xl font-black text-base ${isOverdue(rec.date) ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>{rec.user}</span>
-                                                    <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg ${isOverdue(rec.date) ? 'bg-rose-500 text-white animate-pulse' : 'bg-blue-500 text-white'}`}>{isOverdue(rec.date) ? '逾期' : '工作中'}</span>
-                                                </div>
-                                                <div className="flex gap-2 mt-1">
-                                                    {rec.empId && <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md tracking-tighter uppercase">工號：{isAdminMode ? rec.empId : maskEmpId(rec.empId)}</span>}
-                                                    {isAdminMode && rec.returnCode && <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md shadow-sm uppercase">密碼：{rec.returnCode}</span>}
+                                {displayedActiveRecords.map(rec => {
+                                    const overdue = isOverdue(rec.date); 
+                                    const hrsUsed = calculateHours(rec.date);
+                                    return (
+                                        <div key={rec.id} className={`bg-white rounded-[2rem] p-6 border-l-[12px] shadow-sm transition-all ${overdue ? 'border-rose-600 bg-rose-50/10' : 'border-blue-600'}`}>
+                                            <div className="flex justify-between items-center mb-5">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <span className={`px-5 py-1.5 rounded-xl font-black text-base ${overdue ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>{rec.user}</span>
+                                                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg ${overdue ? 'bg-rose-500 text-white animate-pulse' : 'bg-blue-500 text-white'}`}>{overdue ? '逾期' : '工作中'}</span>
+                                                    </div>
+                                                    <div className="flex gap-2 mt-1">
+                                                        {rec.empId && <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md tracking-tighter uppercase">工號：{isAdminMode ? rec.empId : maskEmpId(rec.empId)}</span>}
+                                                        {isAdminMode && rec.returnCode && <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md shadow-sm uppercase">密碼：{rec.returnCode}</span>}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            <div className="flex flex-wrap gap-2.5 mb-5">{rec.items.map(i => <span key={i} className="px-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono font-bold uppercase">{i}</span>)}</div>
+                                            <div className="text-xs font-black text-slate-400 border-t border-slate-50 pt-5 flex justify-between items-center">
+                                                <div className="flex items-center gap-1.5 font-bold text-slate-500"><span className="icon-wrapper"><Icon name="calendar" className="w-4 h-4" /></span>領出：{formatFullDateTime(rec.date)} <span className="text-blue-600 ml-1">({hrsUsed} 小時)</span></div>
+                                                <button onClick={() => { setActiveTab('return'); setReturnSearchQuery(rec.user.toUpperCase()); }} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black text-xs uppercase shadow-md active:bg-slate-700 text-white">前往歸還</button>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-wrap gap-2.5 mb-5">{rec.items.map(i => <span key={i} className="px-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono font-bold uppercase">{i}</span>)}</div>
-                                        <div className="text-xs font-black text-slate-400 border-t border-slate-50 pt-5 flex justify-between items-center">
-                                            <div className="flex items-center gap-1.5 font-bold text-slate-500"><span className="icon-wrapper"><i data-lucide="calendar" className="w-4 h-4"></i></span>領出：{formatFullDateTime(rec.date)} <span className="text-blue-600 ml-1">({calculateHours(rec.date)} 小時)</span></div>
-                                            <button onClick={() => { setActiveTab('return'); setReturnSearchQuery(rec.user.toUpperCase()); }} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black text-xs uppercase shadow-md active:bg-slate-700">前往歸還</button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
 
+                        {/* 4. 歷史紀錄查詢與備份分頁 */}
                         {activeTab === 'history' && (
                             <div className="space-y-4 pb-20 animate-in fade-in duration-300 text-slate-800">
                                 <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-200 space-y-5">
                                     <div className="relative">
-                                        <span className="icon-wrapper absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"><i data-lucide="search" className="w-5 h-5"></i></span>
+                                        <span className="icon-wrapper absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"><Icon name="search" className="w-5 h-5" /></span>
                                         <input type="text" className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 outline-none focus:border-blue-500 font-bold text-base shadow-inner transition-all uppercase" placeholder="搜尋姓名、工號或編號..." value={historySearchTerm} onChange={(e) => setHistorySearchTerm(e.target.value.toUpperCase())} />
                                     </div>
                                     <div className="space-y-4">
@@ -646,29 +865,26 @@
                                                 <input type="date" className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-3 text-sm font-bold text-slate-800" value={endDate} onChange={e => setEndDate(e.target.value)} />
                                             </div>
                                         </div>
-                                        {/* 修正：更名為 匯出使用紀錄 (V15.0) */}
-                                        <button onClick={exportCSV} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2.5 shadow-md active:bg-slate-700 transition-all">
-                                            <span className="icon-wrapper"><i data-lucide="file-spreadsheet" className="text-green-400 w-5 h-5"></i></span> 匯出使用紀錄 (CSV)
-                                        </button>
+                                        <button onClick={exportCSV} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2.5 shadow-md active:bg-slate-700 transition-all text-white"><span className="icon-wrapper"><Icon name="file-spreadsheet" className="text-green-400 w-5 h-5" /></span> 匯出使用紀錄 (CSV)</button>
                                         <div className="flex justify-between items-center px-1 pt-2 border-t border-slate-100">
                                             <button onClick={() => selectedHistoryIds.length === filteredHistoryRecords.length ? setSelectedHistoryIds([]) : setSelectedHistoryIds(filteredHistoryRecords.map(r => r.id))} className="text-[11px] font-black text-blue-600 underline">全選目前結果</button>
-                                            {selectedHistoryIds.length > 0 && <button onClick={batchPrepareHistoryDelete} className="bg-rose-100 text-rose-700 px-4 py-2 rounded-xl font-black text-[11px] flex items-center gap-1.5 border border-rose-200"><span className="icon-wrapper"><i data-lucide="trash-2" className="w-3.5 h-3.5"></i></span> 刪除所選 ({selectedHistoryIds.length})</button>}
+                                            {selectedHistoryIds.length > 0 && <button onClick={batchPrepareHistoryDelete} className="bg-rose-100 text-rose-700 px-4 py-2 rounded-xl font-black text-[11px] flex items-center gap-1.5 border border-rose-200"><span className="icon-wrapper"><Icon name="trash-2" className="w-3.5 h-3.5" /></span> 刪除所選 ({selectedHistoryIds.length})</button>}
                                         </div>
                                     </div>
                                 </div>
                                 {groupedHistory.map(g => (
                                     <div key={g.date} className="space-y-3">
-                                        <div className="text-xs font-black text-slate-400 uppercase py-2 tracking-widest pl-3 flex items-center gap-2"><span className="icon-wrapper"><i data-lucide="calendar-days" className="w-4 h-4"></i></span> {g.date}</div>
+                                        <div className="text-xs font-black text-slate-400 uppercase py-2 tracking-widest pl-3 flex items-center gap-2"><span className="icon-wrapper"><Icon name="calendar-days" className="w-4 h-4" /></span> {g.date}</div>
                                         {g.data.map(rec => (
                                             <div key={rec.id} className={`bg-white rounded-[2rem] p-6 border shadow-sm flex group transition-all relative gap-4 ${selectedHistoryIds.includes(rec.id) ? 'border-blue-400 bg-blue-50/20' : 'border-slate-100'}`}>
                                                 <div className="flex flex-col justify-center pt-1" onClick={() => toggleHistorySelection(rec.id)}>
-                                                    <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${selectedHistoryIds.includes(rec.id) ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-slate-200'}`}>
-                                                        {selectedHistoryIds.includes(rec.id) && <span className="icon-wrapper"><i data-lucide="check" className="w-4 h-4"></i></span>}
+                                                    <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${selectedHistoryIds.includes(rec.id) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200'}`}>
+                                                        {selectedHistoryIds.includes(rec.id) && <span className="icon-wrapper"><Icon name="check" className="w-4 h-4" /></span>}
                                                     </div>
                                                 </div>
                                                 <div className="flex-1">
                                                     <div className="flex justify-between items-start">
-                                                        <div className="flex-1" onClick={() => toggleHistorySelection(rec.id)}>
+                                                        <div onClick={() => toggleHistorySelection(rec.id)} className="flex-1">
                                                             <h4 className="font-black text-base text-slate-800">{rec.user}</h4>
                                                             {rec.empId && <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">工號：{isAdminMode ? rec.empId : maskEmpId(rec.empId)}</p>}
                                                             <p className="text-[11px] text-slate-400 mt-0.5 font-bold uppercase">{rec.status === 'Checked Out' ? `領用於 ${formatFullDateTime(rec.date)}` : `歸還於 ${formatFullDateTime(rec.returnDate)}`}</p>
@@ -676,7 +892,7 @@
                                                         </div>
                                                         <div className="flex items-center gap-2.5">
                                                             <span className={`text-[10px] font-black px-3 py-1 rounded-full ${rec.status === 'Checked Out' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>{rec.status === 'Checked Out' ? '領用中' : '已歸還'}</span>
-                                                            {isAdminMode && <button onClick={() => { setIsDeleteModalOpen(true); setPendingDeleteIds([rec.id]); }} className="text-rose-300 p-2 active:text-rose-500 transition-all"><span className="icon-wrapper"><i data-lucide="trash-2" className="w-6 h-6"></i></span></button>}
+                                                            {isAdminMode && <button onClick={() => { setIsDeleteModalOpen(true); setPendingDeleteIds([rec.id]); }} className="text-rose-300 p-2 active:text-rose-500 transition-all"><span className="icon-wrapper"><Icon name="trash-2" className="w-6 h-6" /></span></button>}
                                                         </div>
                                                     </div>
                                                     <div className="mt-4 flex flex-wrap gap-2" onClick={() => toggleHistorySelection(rec.id)}>{rec.items.map(i => <span key={i} className="text-xs font-mono font-bold text-slate-500 bg-slate-50 px-3 py-1 border border-slate-100 rounded-lg uppercase">{i}</span>)}</div>
@@ -692,14 +908,15 @@
                         )}
                     </main>
 
+                    {/* 頁尾總攬與管理員鎖定按鈕 */}
                     <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 border-t border-slate-200 px-6 py-5 flex flex-col z-30 shadow-2xl backdrop-blur-md text-slate-700">
                         <div className="flex justify-between items-center mb-1">
                             <div className="flex space-x-6 sm:space-x-8">
-                                <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-black uppercase leading-tight tracking-tighter">借出總數</span><span className="text-xl font-black text-slate-700 leading-none">{totalItemsLent}</span></div>
+                                <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-black uppercase leading-tight tracking-tighter">借出總數</span><span className="text-xl font-black leading-none">{totalItemsLent}</span></div>
                                 <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-black uppercase leading-tight tracking-tighter text-rose-600">逾期數量</span><span className={`text-xl font-black leading-none ${overdueItemsCount > 0 ? 'text-rose-600' : ''}`}>{overdueItemsCount}</span></div>
                                 <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-black uppercase leading-tight tracking-tighter text-blue-700">領用中</span><span className="text-xl font-black text-blue-700 leading-none">{usagePeopleCount}</span></div>
                             </div>
-                            <div className="text-[9px] font-black text-slate-300 italic tracking-tighter uppercase text-right leading-tight">Socket<br/>V15.0 Final</div>
+                            <div className="text-[9px] font-black text-slate-300 italic tracking-tighter uppercase text-right leading-tight">Socket<br/>V15.4 Final</div>
                         </div>
                         <div className="pt-2 border-t border-slate-50 flex justify-end">
                             <button onClick={() => isAdminMode ? setIsAdminMode(false) : setIsAdminModalOpen(true)} className={`text-[9px] font-black px-3 py-1 rounded-full border transition-all shadow-sm ${isAdminMode ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-200'}`}>
@@ -711,7 +928,14 @@
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
+        // 確保 DOM 載入後才初始化 React 根節點，防止沙盒異步掛載錯誤
+        window.onload = function() {
+            var rootEl = document.getElementById('root');
+            if (rootEl) {
+                const root = ReactDOM.createRoot(rootEl);
+                root.render(<App />);
+            }
+        };
     </script>
 </body>
 </html>
